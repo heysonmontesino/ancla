@@ -1,0 +1,35 @@
+{
+  "ok": true,
+  "audioDirectory": "/Users/heysonmontesino/Downloads",
+  "metadataPath": "/Users/heysonmontesino/Documents/app_pap_respiracion/tools/audio_pipeline/examples/bulk_import_downloads_2026_03_28_grounding_focus_anxiety_long.json",
+  "total": 3,
+  "successCount": 3,
+  "failureCount": 0,
+  "successes": [
+    {
+      "id": "volver_al_cuerpo",
+      "title": "Volver al cuerpo",
+      "status": "success",
+      "documentId": "volver_al_cuerpo",
+      "audioUrl": "https://pub-a8cf04659e0449f09c2dbe7f41598be6.r2.dev/sessions/2026-03-28T15-10-43-363Z-volver-al-cuerpo.mp3",
+      "objectKey": "sessions/2026-03-28T15-10-43-363Z-volver-al-cuerpo.mp3"
+    },
+    {
+      "id": "entrar_en_una_sola_cosa",
+      "title": "Entrar en una sola cosa",
+      "status": "success",
+      "documentId": "entrar_en_una_sola_cosa",
+      "audioUrl": "https://pub-a8cf04659e0449f09c2dbe7f41598be6.r2.dev/sessions/2026-03-28T15-10-45-851Z-entrar-en-una-sola-cosa.mp3",
+      "objectKey": "sessions/2026-03-28T15-10-45-851Z-entrar-en-una-sola-cosa.mp3"
+    },
+    {
+      "id": "cuando_todo_se_acelera",
+      "title": "Cuando todo se acelera",
+      "status": "success",
+      "documentId": "cuando_todo_se_acelera",
+      "audioUrl": "https://pub-a8cf04659e0449f09c2dbe7f41598be6.r2.dev/sessions/2026-03-28T15-10-48-220Z-cuando-todo-se-acelera.mp3",
+      "objectKey": "sessions/2026-03-28T15-10-48-220Z-cuando-todo-se-acelera.mp3"
+    }
+  ],
+  "failures": []
+}

@@ -1,0 +1,30 @@
+[
+  {
+    "fileName": "Antes de lo dificil.mp3",
+    "documentId": "antes_de_lo_dificil",
+    "title": "Antes de lo difícil",
+    "category": "anxiety",
+    "duration": 163
+  },
+  {
+    "fileName": "Reset en 90 segundos.mp3",
+    "documentId": "reset_en_90_segundos",
+    "title": "Reset en 90 segundos",
+    "category": "stress",
+    "duration": 125
+  },
+  {
+    "fileName": "Salir de la espiral.mp3",
+    "documentId": "salir_de_la_espiral",
+    "title": "Salir de la espiral",
+    "category": "anxiety",
+    "duration": 199
+  },
+  {
+    "fileName": "Descompresion Post-turno.m4a",
+    "documentId": "descompresion_post_turno",
+    "title": "Descompresión Post-Turno",
+    "category": "stress",
+    "duration": 284
+  }
+]

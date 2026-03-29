@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter pub:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(find /Users/heysonmontesino/Documents/app_pap_respiracion -name firestore.rules -o -name *.rules)",
+      "Bash(python3 -:*)"
+    ]
+  }
+}

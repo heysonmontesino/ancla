@@ -1,0 +1,26 @@
+[
+  {
+    "id": "missing_token",
+    "description": "Rechaza requests sin Authorization Bearer",
+    "expectedStatus": 401,
+    "actualStatus": 401,
+    "passed": true,
+    "responseText": "No autorizado."
+  },
+  {
+    "id": "invalid_token",
+    "description": "Rechaza requests con token Bearer invalido",
+    "expectedStatus": 401,
+    "actualStatus": 401,
+    "passed": true,
+    "responseText": "No autorizado."
+  },
+  {
+    "id": "valid_token",
+    "description": "Acepta requests con token Bearer valido",
+    "expectedStatus": 200,
+    "actualStatus": 200,
+    "passed": true,
+    "responseText": "Siento que estés pasando por esto. Si hay riesgo inmediato para ti o para otra persona, usa el modulo SOS ahora mismo y busca ayuda humana inmediata. Si puedes, contacta a un familiar, amigo de confianza o a los servicios de emergencia de tu zona en este momento."
+  }
+]

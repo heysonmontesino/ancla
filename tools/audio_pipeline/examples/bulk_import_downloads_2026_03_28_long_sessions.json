@@ -1,0 +1,26 @@
+[
+  {
+    "fileName": "Reconstruir el animo.mp3",
+    "documentId": "reconstruir_el_animo",
+    "title": "Reconstruir el ánimo",
+    "category": "mood",
+    "duration": 512,
+    "description": "Sesión extensa para recuperar energía interna, presencia y elevación emocional gradual."
+  },
+  {
+    "fileName": "Liberar la presion interna.mp3",
+    "documentId": "liberar_la_presion_interna",
+    "title": "Liberar la presión interna",
+    "category": "stress",
+    "duration": 491,
+    "description": "Sesión larga para descargar tensión acumulada y reducir sensación de presión mental y corporal."
+  },
+  {
+    "fileName": "Descenso profundo.mp3",
+    "documentId": "descenso_profundo",
+    "title": "Descenso profundo",
+    "category": "sleep",
+    "duration": 542,
+    "description": "Sesión nocturna prolongada para soltar vigilancia interna y facilitar la transición al descanso."
+  }
+]

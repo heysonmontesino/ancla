@@ -1,0 +1,35 @@
+{
+  "ok": true,
+  "audioDirectory": "/Users/heysonmontesino/Downloads",
+  "metadataPath": "/Users/heysonmontesino/Documents/app_pap_respiracion/tools/audio_pipeline/examples/bulk_import_downloads_2026_03_28_focus_mood_long_followup.json",
+  "total": 3,
+  "successCount": 3,
+  "failureCount": 0,
+  "successes": [
+    {
+      "id": "sostener_la_atencion",
+      "title": "Sostener la atención",
+      "status": "success",
+      "documentId": "sostener_la_atencion",
+      "audioUrl": "https://pub-a8cf04659e0449f09c2dbe7f41598be6.r2.dev/sessions/2026-03-28T15-37-16-245Z-sostener-la-atencion.mp3",
+      "objectKey": "sessions/2026-03-28T15-37-16-245Z-sostener-la-atencion.mp3"
+    },
+    {
+      "id": "cerrar_el_ruido",
+      "title": "Cerrar el ruido",
+      "status": "success",
+      "documentId": "cerrar_el_ruido",
+      "audioUrl": "https://pub-a8cf04659e0449f09c2dbe7f41598be6.r2.dev/sessions/2026-03-28T15-37-19-124Z-cerrar-el-ruido.mp3",
+      "objectKey": "sessions/2026-03-28T15-37-19-124Z-cerrar-el-ruido.mp3"
+    },
+    {
+      "id": "recuperar_impulso",
+      "title": "Recuperar impulso",
+      "status": "success",
+      "documentId": "recuperar_impulso",
+      "audioUrl": "https://pub-a8cf04659e0449f09c2dbe7f41598be6.r2.dev/sessions/2026-03-28T15-37-21-433Z-recuperar-impulso.mp3",
+      "objectKey": "sessions/2026-03-28T15-37-21-433Z-recuperar-impulso.mp3"
+    }
+  ],
+  "failures": []
+}

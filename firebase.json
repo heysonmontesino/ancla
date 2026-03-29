@@ -1,0 +1,44 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "pap-respiracion-sos",
+          "appId": "1:532695919536:android:7da722fc36a035f5f74475",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "pap-respiracion-sos",
+          "appId": "1:532695919536:ios:0d81183448506fe5f74475",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "pap-respiracion-sos",
+          "configurations": {
+            "android": "1:532695919536:android:7da722fc36a035f5f74475",
+            "ios": "1:532695919536:ios:0d81183448506fe5f74475"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/privacy",
+        "destination": "/privacy.html"
+      }
+    ]
+  }
+}

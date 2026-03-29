@@ -1,0 +1,26 @@
+[
+  {
+    "fileName": "Volver a la luz.mp3",
+    "documentId": "volver_a_la_luz",
+    "title": "Volver a la luz",
+    "category": "mood",
+    "duration": 170,
+    "description": "Sesión breve para elevar suavemente el estado de ánimo y recuperar sensación de energía interna."
+  },
+  {
+    "fileName": "Bajar la sobrecarga.mp3",
+    "documentId": "bajar_la_sobrecarga",
+    "title": "Bajar la sobrecarga",
+    "category": "stress",
+    "duration": 181,
+    "description": "Pausa guiada para descargar saturación mental y reducir la sensación de sobrecarga."
+  },
+  {
+    "fileName": "Apagar el ruido mental.mp3",
+    "documentId": "apagar_el_ruido_mental",
+    "title": "Apagar el ruido mental",
+    "category": "sleep",
+    "duration": 237,
+    "description": "Sesión nocturna para reducir actividad cognitiva y facilitar la transición al descanso."
+  }
+]

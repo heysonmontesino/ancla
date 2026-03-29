@@ -1,0 +1,20 @@
+{
+  "name": "audio-pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "upload": "node src/upload_audio_and_register.mjs",
+    "upload-file": "node src/upload_file_to_cloudflare.mjs",
+    "bulk-import": "node src/bulk_import_audio_and_register.mjs",
+    "test": "node --test tests/pipeline.test.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.868.0",
+    "dotenv": "^16.6.1",
+    "firebase-admin": "^13.5.0"
+  }
+}

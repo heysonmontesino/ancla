@@ -1,0 +1,26 @@
+[
+  {
+    "id": "missing_token",
+    "description": "Rechaza requests sin Authorization Bearer",
+    "expectedStatus": 401,
+    "actualStatus": null,
+    "passed": false,
+    "responseText": "fetch failed"
+  },
+  {
+    "id": "invalid_token",
+    "description": "Rechaza requests con token Bearer invalido",
+    "expectedStatus": 401,
+    "actualStatus": null,
+    "passed": false,
+    "responseText": "fetch failed"
+  },
+  {
+    "id": "valid_token",
+    "description": "Acepta requests con token Bearer valido",
+    "expectedStatus": 200,
+    "actualStatus": null,
+    "passed": false,
+    "responseText": "Missing required env var: AI_CHAT_TEST_BEARER_TOKEN"
+  }
+]

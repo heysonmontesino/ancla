@@ -1,0 +1,50 @@
+[
+  {
+    "fileName": "El suspiro fisiologico.mp3",
+    "documentId": "el_suspiro_fisiologico",
+    "title": "El suspiro fisiológico",
+    "category": "anxiety",
+    "duration": 135,
+    "description": "Técnica breve de regulación con doble inhalación para bajar activación física y recuperar calma.",
+    "coverImageUrl": "https://pub-a8cf04659e0449f09c2dbe7f41598be6.r2.dev/covers/harmonia/el_suspiro_fisiologico/v1-a.png",
+    "coverVariant": "a",
+    "coverPromptVersion": "harmonia-v1",
+    "coverStatus": "approved"
+  },
+  {
+    "fileName": "Reset en 90 segundos.mp3",
+    "documentId": "reset_en_90_segundos",
+    "title": "Reset en 90 segundos",
+    "category": "stress",
+    "duration": 125,
+    "description": "Pausa breve para interrumpir el estrés agudo y volver al cuerpo con más estabilidad.",
+    "coverImageUrl": "https://pub-a8cf04659e0449f09c2dbe7f41598be6.r2.dev/covers/harmonia/reset_en_90_segundos/v1-a.png",
+    "coverVariant": "a",
+    "coverPromptVersion": "harmonia-v1",
+    "coverStatus": "approved"
+  },
+  {
+    "fileName": "Soltar el dia.mp3",
+    "documentId": "soltar_el_dia",
+    "title": "Soltar el día",
+    "category": "sleep",
+    "duration": 315,
+    "description": "Sesión de transición para cerrar el día, aflojar el ritmo y facilitar el descanso.",
+    "coverImageUrl": "https://pub-a8cf04659e0449f09c2dbe7f41598be6.r2.dev/covers/harmonia/soltar_el_dia/v1-a.png",
+    "coverVariant": "a",
+    "coverPromptVersion": "harmonia-v1",
+    "coverStatus": "approved"
+  },
+  {
+    "fileName": "Anclaje de trabajo profundo.mp3",
+    "documentId": "x0YU9KvEPYovRJ460LaD",
+    "title": "Anclaje de trabajo profundo",
+    "category": "focus",
+    "duration": 300,
+    "description": "Anclaje de foco para entrar en trabajo profundo con claridad mental y menor dispersión.",
+    "coverImageUrl": "https://pub-a8cf04659e0449f09c2dbe7f41598be6.r2.dev/covers/harmonia/x0YU9KvEPYovRJ460LaD/v1-a.png",
+    "coverVariant": "a",
+    "coverPromptVersion": "harmonia-v1",
+    "coverStatus": "approved"
+  }
+]

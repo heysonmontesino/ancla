@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "532695919536",
+    "project_id": "pap-respiracion-sos",
+    "storage_bucket": "pap-respiracion-sos.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:532695919536:android:7da722fc36a035f5f74475",
+        "android_client_info": {
+          "package_name": "com.example.app_pap_respiracion"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCiX2QQB2KEc7G6YKSmXPgJxryRXgEhhxA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

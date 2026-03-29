@@ -1,0 +1,16 @@
+[
+  {
+    "fileName": "respiracion-calma.mp3",
+    "title": "Respiración para calmarte",
+    "category": "anxiety",
+    "duration": 180,
+    "description": "Sesión breve para bajar activación y volver al cuerpo."
+  },
+  {
+    "fileName": "pausa-suave.mp3",
+    "title": "Pausa suave",
+    "category": "stress",
+    "duration": 240,
+    "description": "Pausa guiada corta para soltar tensión acumulada."
+  }
+]

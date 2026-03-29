@@ -1,0 +1,26 @@
+[
+  {
+    "fileName": "Aflojar por dentro.mp3",
+    "documentId": "aflojar_por_dentro",
+    "title": "Aflojar por dentro",
+    "category": "stress",
+    "duration": 427,
+    "description": "Sesión larga para reducir tensión interna acumulada, bajar presión corporal y recuperar flexibilidad emocional."
+  },
+  {
+    "fileName": "Volver a apagar.mp3",
+    "documentId": "volver_a_apagar",
+    "title": "Volver a apagar",
+    "category": "sleep",
+    "duration": 527,
+    "description": "Sesión nocturna extensa para disminuir reactivación mental y facilitar el regreso al descanso."
+  },
+  {
+    "fileName": "Reiniciar con suavidad.mp3",
+    "documentId": "reiniciar_con_suavidad",
+    "title": "Reiniciar con suavidad",
+    "category": "mood",
+    "duration": 487,
+    "description": "Sesión larga para recuperar energía emocional, presencia y disponibilidad afectiva gradual sin exigencia interna."
+  }
+]

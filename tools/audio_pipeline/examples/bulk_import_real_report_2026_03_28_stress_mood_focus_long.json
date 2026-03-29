@@ -1,0 +1,35 @@
+{
+  "ok": true,
+  "audioDirectory": "/Users/heysonmontesino/Downloads",
+  "metadataPath": "/Users/heysonmontesino/Documents/app_pap_respiracion/tools/audio_pipeline/examples/bulk_import_downloads_2026_03_28_stress_mood_focus_long.json",
+  "total": 3,
+  "successCount": 3,
+  "failureCount": 0,
+  "successes": [
+    {
+      "id": "salir_de_la_saturacion",
+      "title": "Salir de la saturación",
+      "status": "success",
+      "documentId": "salir_de_la_saturacion",
+      "audioUrl": "https://pub-a8cf04659e0449f09c2dbe7f41598be6.r2.dev/sessions/2026-03-28T17-57-26-779Z-salir-de-la-saturacion.mp3",
+      "objectKey": "sessions/2026-03-28T17-57-26-779Z-salir-de-la-saturacion.mp3"
+    },
+    {
+      "id": "volver_a_encenderse",
+      "title": "Volver a encenderse",
+      "status": "success",
+      "documentId": "volver_a_encenderse",
+      "audioUrl": "https://pub-a8cf04659e0449f09c2dbe7f41598be6.r2.dev/sessions/2026-03-28T17-57-29-995Z-volver-a-encenderse.mp3",
+      "objectKey": "sessions/2026-03-28T17-57-29-995Z-volver-a-encenderse.mp3"
+    },
+    {
+      "id": "profundizar_sin_prisa",
+      "title": "Profundizar sin prisa",
+      "status": "success",
+      "documentId": "profundizar_sin_prisa",
+      "audioUrl": "https://pub-a8cf04659e0449f09c2dbe7f41598be6.r2.dev/sessions/2026-03-28T17-57-32-575Z-profundizar-sin-prisa.mp3",
+      "objectKey": "sessions/2026-03-28T17-57-32-575Z-profundizar-sin-prisa.mp3"
+    }
+  ],
+  "failures": []
+}

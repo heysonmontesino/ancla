@@ -1,0 +1,23 @@
+{
+  "ok": false,
+  "audioDirectory": "/Users/heysonmontesino/Downloads",
+  "metadataPath": "/tmp/bulk_import_real_existing_audio.json",
+  "total": 2,
+  "successCount": 0,
+  "failureCount": 2,
+  "successes": [],
+  "failures": [
+    {
+      "fileName": "Anclaje de trabajo profundo.mp3",
+      "title": "Anclaje de trabajo profundo",
+      "status": "failed",
+      "error": "Missing required env var: CLOUDFLARE_R2_PUBLIC_BASE_URL"
+    },
+    {
+      "fileName": "Desactivacion progresiva total.mp3",
+      "title": "Desactivacion progresiva total",
+      "status": "failed",
+      "error": "Missing required env var: CLOUDFLARE_R2_PUBLIC_BASE_URL"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "ok": false,
+  "audioDirectory": "/Users/heysonmontesino/Downloads",
+  "metadataPath": "/Users/heysonmontesino/Documents/app_pap_respiracion/tools/audio_pipeline/examples/bulk_import_sample.json",
+  "total": 2,
+  "successCount": 0,
+  "failureCount": 2,
+  "successes": [],
+  "failures": [
+    {
+      "fileName": "respiracion-calma.mp3",
+      "title": "Respiración para calmarte",
+      "status": "failed",
+      "error": "Audio file not found: /Users/heysonmontesino/Downloads/respiracion-calma.mp3"
+    },
+    {
+      "fileName": "pausa-suave.mp3",
+      "title": "Pausa suave",
+      "status": "failed",
+      "error": "Audio file not found: /Users/heysonmontesino/Downloads/pausa-suave.mp3"
+    }
+  ]
+}

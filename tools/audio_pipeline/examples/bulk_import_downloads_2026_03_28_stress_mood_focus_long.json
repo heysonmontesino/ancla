@@ -1,0 +1,26 @@
+[
+  {
+    "fileName": "Salir de la saturacion.mp3",
+    "documentId": "salir_de_la_saturacion",
+    "title": "Salir de la saturación",
+    "category": "stress",
+    "duration": 533,
+    "description": "Sesión larga para reducir sobrecarga prolongada, bajar presión interna y recuperar sensación de espacio mental."
+  },
+  {
+    "fileName": "Volver a encenderse.mp3",
+    "documentId": "volver_a_encenderse",
+    "title": "Volver a encenderse",
+    "category": "mood",
+    "duration": 495,
+    "description": "Sesión extensa para recuperar energía emocional, presencia y disponibilidad afectiva gradual."
+  },
+  {
+    "fileName": "Profundizar sin prisa.mp3",
+    "documentId": "profundizar_sin_prisa",
+    "title": "Profundizar sin prisa",
+    "category": "focus",
+    "duration": 491,
+    "description": "Sesión larga de enfoque para reducir prisa interna y facilitar trabajo profundo con mayor estabilidad."
+  }
+]

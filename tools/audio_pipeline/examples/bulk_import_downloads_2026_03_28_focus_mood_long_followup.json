@@ -1,0 +1,26 @@
+[
+  {
+    "fileName": "Sostener la atencion.mp3",
+    "documentId": "sostener_la_atencion",
+    "title": "Sostener la atención",
+    "category": "focus",
+    "duration": 530,
+    "description": "Sesión larga de enfoque para reunir atención dispersa y sostener trabajo profundo con mayor estabilidad."
+  },
+  {
+    "fileName": "Cerrar el ruido.mp3",
+    "documentId": "cerrar_el_ruido",
+    "title": "Cerrar el ruido",
+    "category": "focus",
+    "duration": 410,
+    "description": "Sesión extensa para bajar interferencia mental y preparar un estado de concentración más limpio."
+  },
+  {
+    "fileName": "Recuperar impulso.mp3",
+    "documentId": "recuperar_impulso",
+    "title": "Recuperar impulso",
+    "category": "mood",
+    "duration": 465,
+    "description": "Sesión larga para reconstruir energía interna, presencia y disponibilidad emocional gradual."
+  }
+]

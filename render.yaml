@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: asis-emocional-backend
+    runtime: node
+    plan: free
+    rootDir: apps/ai_backend
+    buildCommand: npm install && npm run build
+    startCommand: node dist/server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: PORT
+        value: 10000
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: AI_MODEL
+        value: "openrouter/auto"
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        value: "pap-respiracion-sos"
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false

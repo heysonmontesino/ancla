@@ -1,0 +1,26 @@
+[
+  {
+    "fileName": "Volver al cuerpo.mp3",
+    "documentId": "volver_al_cuerpo",
+    "title": "Volver al cuerpo",
+    "category": "anxiety",
+    "duration": 411,
+    "description": "Sesión extensa de grounding para reconectar con el cuerpo, bajar rumiación y recuperar sensación de presencia."
+  },
+  {
+    "fileName": "Entrar en una sola cosa.mp3",
+    "documentId": "entrar_en_una_sola_cosa",
+    "title": "Entrar en una sola cosa",
+    "category": "focus",
+    "duration": 466,
+    "description": "Sesión larga de enfoque para reunir atención dispersa y facilitar la entrada en trabajo profundo."
+  },
+  {
+    "fileName": "Cuando todo se acelera.mp3",
+    "documentId": "cuando_todo_se_acelera",
+    "title": "Cuando todo se acelera",
+    "category": "anxiety",
+    "duration": 531,
+    "description": "Sesión extensa de contención para bajar activación interna, reducir velocidad mental y recuperar estabilidad."
+  }
+]

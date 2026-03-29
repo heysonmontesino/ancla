@@ -1,0 +1,455 @@
+import { generateObject, gateway, streamText } from 'ai';
+import type { ZodType } from 'zod';
+
+import { systemPrompt } from '../prompts/systemPrompt.js';
+import { env } from './env.js';
+
+const acuteRiskPattern =
+  /\b(suicid(?:e|io|arme|arme)|matarme|quitarme la vida|autolesi(?:o|ó)n|self[- ]?harm|kill myself|end my life|lastimar(?:me)?|hacerme daño|violencia|matar a alguien|quiero desaparecer|no quiero vivir|overdose|sobredosis|me quiero cortar|quiero cortarme|cortarme ahora|cortarme ahora mismo|pensando en tomarmelas ahora|pensando en tomármelas ahora|tomarmelas ahora|tomármelas ahora)\b/i;
+
+const ambiguousRiskStrongPattern =
+  /\b(todo seria mas facil si no estuviera|todo sería más fácil si no estuviera|quisiera desaparecer|no le veo sentido|todos estarian mejor sin mi|todos estarían mejor sin mí|los demas estarian mejor sin mi|los demás estarían mejor sin mí|quisiera dormir y no despertar|no aguanto mas|no aguanto más|ya no quiero seguir|no quiero estar aqui|no quiero estar aquí|no quiero hacer nada impulsivo)\b/i;
+
+const ambiguousRiskWeakPattern =
+  /\b(no se si pueda seguir asi|no sé si pueda seguir así|me gustaria dormirme y no pensar en nada|me gustaría dormirme y no pensar en nada)\b/i;
+
+const highActivationSignalPattern =
+  /\b(temblando|muy activado|muy alterado|me cuesta respirar profundo|discusion|discusión)\b/i;
+
+const nonEmergencyNegationPattern =
+  /\b(no es una emergencia|no estoy en peligro)\b/i;
+
+const explicitEmergencyAffirmativePattern =
+  /\b(esto es una emergencia|es una emergencia|estoy en una emergencia|no me siento seguro conmigo mismo|no me siento seguro conmigo misma|no me siento seguro ahora|no me siento segura ahora)\b/i;
+
+type GatewayByokProviderOptions = {
+  gateway?: {
+    byok?: Record<string, GatewayByokCredential[]>;
+    providerTimeouts?: {
+      byok?: Record<string, number>;
+    };
+  };
+};
+
+type GatewayByokScalar = string | number | boolean | null;
+type GatewayByokCredential = {
+  [key: string]:
+    | GatewayByokScalar
+    | GatewayByokScalar[]
+    | GatewayByokCredential
+    | GatewayByokCredential[];
+};
+
+type StreamProbeResult = {
+  firstChunk: ReadableStreamReadResult<string>;
+  reader: ReadableStreamDefaultReader<string>;
+};
+
+type StreamableTextResult = {
+  textStream: ReadableStream<string>;
+};
+
+const providerTimeoutByokMs = 15_000;
+const openRouterBaseUrl = 'https://openrouter.ai/api/v1/chat/completions';
+
+export function containsAcuteRiskLanguage(message: string): boolean {
+  return acuteRiskPattern.test(message);
+}
+
+export function containsAmbiguousRiskLanguage(message: string): boolean {
+  return (
+    ambiguousRiskStrongPattern.test(message) ||
+    ambiguousRiskWeakPattern.test(message)
+  );
+}
+
+export function containsNonEmergencyHighActivationLanguage(
+  message: string,
+): boolean {
+  return (
+    highActivationSignalPattern.test(message) &&
+    nonEmergencyNegationPattern.test(message) &&
+    !containsAcuteRiskLanguage(message) &&
+    !containsAmbiguousRiskLanguage(message)
+  );
+}
+
+export function containsExplicitEmergencyLanguage(message: string): boolean {
+  return (
+    !nonEmergencyNegationPattern.test(message) &&
+    explicitEmergencyAffirmativePattern.test(message)
+  );
+}
+
+export function getAcuteRiskReply(): string {
+  return [
+    'Siento que estés pasando por esto.',
+    'Si hay riesgo inmediato para ti o para otra persona, usa el modulo SOS ahora mismo y busca ayuda humana inmediata.',
+    'Si puedes, contacta a un familiar, amigo de confianza o a los servicios de emergencia de tu zona en este momento.',
+  ].join(' ');
+}
+
+export function getAmbiguousRiskReply(): string {
+  return [
+    'Lo que acabas de decir es importante y no conviene quedarte con eso a solas.',
+    'Si hay posibilidad de hacerte daño, usa el modulo SOS ahora mismo.',
+    'Busca apoyo humano inmediato con alguien de confianza o con un servicio de emergencia de tu zona.',
+  ].join(' ');
+}
+
+export function getNonEmergencyHighActivationReply(): string {
+  return 'Tu cuerpo quedó muy activado. Suelta el aire lento una vez y afloja la mandíbula.';
+}
+
+export function createTherapeuticTextStream(
+  message: string,
+  abortSignal: AbortSignal,
+) {
+  if (env.AI_MODEL.startsWith('openrouter/')) {
+    return createOpenRouterTextStream(message, abortSignal);
+  }
+
+  return streamText({
+    model: gateway(env.AI_MODEL),
+    system: systemPrompt,
+    prompt: message,
+    abortSignal,
+    temperature: 0.4,
+    maxRetries: 1,
+    maxOutputTokens: 350,
+    providerOptions: getGatewayProviderOptions(env.AI_MODEL),
+  });
+}
+
+export async function generateStructuredObject<T>({
+  system,
+  prompt,
+  schema,
+  abortSignal,
+}: {
+  system: string;
+  prompt: string;
+  schema: ZodType<T>;
+  abortSignal: AbortSignal;
+}): Promise<T> {
+  if (env.AI_MODEL.startsWith('openrouter/')) {
+    throw new Error('Structured recommendation is not available for openrouter models');
+  }
+
+  const result = await generateObject({
+    model: gateway(env.AI_MODEL),
+    system,
+    prompt,
+    schema,
+    abortSignal,
+    temperature: 0.2,
+    maxRetries: 1,
+    providerOptions: getGatewayProviderOptions(env.AI_MODEL),
+  });
+
+  return result.object;
+}
+
+export async function probeTextStream(
+  result: StreamableTextResult,
+): Promise<StreamProbeResult> {
+  const reader = result.textStream.getReader();
+  const firstChunk = await reader.read();
+
+  return { firstChunk, reader };
+}
+
+export function rebuildTextStreamFromProbe({
+  firstChunk,
+  reader,
+}: StreamProbeResult): ReadableStream<string> {
+  let bufferedChunk: ReadableStreamReadResult<string> | null = firstChunk;
+
+  return new ReadableStream<string>({
+    async pull(controller) {
+      if (bufferedChunk) {
+        if (bufferedChunk.done) {
+          controller.close();
+          bufferedChunk = null;
+          return;
+        }
+
+        controller.enqueue(bufferedChunk.value);
+        bufferedChunk = null;
+        return;
+      }
+
+      const nextChunk = await reader.read();
+      if (nextChunk.done) {
+        controller.close();
+        return;
+      }
+
+      controller.enqueue(nextChunk.value);
+    },
+    async cancel(reason) {
+      await reader.cancel(reason).catch(() => undefined);
+    },
+  });
+}
+
+export function getUpstreamErrorMessage(error: unknown): string {
+  const rawMessage =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : JSON.stringify(error);
+
+  const normalized = rawMessage.toLowerCase();
+
+  if (
+    normalized.includes('customer_verification_required') ||
+    normalized.includes('valid credit card') ||
+    normalized.includes('billing')
+  ) {
+    return 'El servicio de IA no esta habilitado correctamente en el backend. Verifica AI Gateway o la configuracion BYOK e intenta de nuevo.';
+  }
+
+  if (
+    normalized.includes('rate limit') ||
+    normalized.includes('too many requests')
+  ) {
+    return 'El asistente esta temporalmente ocupado. Intenta de nuevo en aproximadamente un minuto.';
+  }
+
+  if (
+    normalized.includes('invalid api key') ||
+    normalized.includes('authentication') ||
+    normalized.includes('unauthorized') ||
+    normalized.includes('forbidden')
+  ) {
+    return 'La configuracion del proveedor de IA no es valida en este momento. Revisa las credenciales del backend.';
+  }
+
+  if (
+    normalized.includes('timeout') ||
+    normalized.includes('timed out') ||
+    normalized.includes('aborted')
+  ) {
+    return 'La respuesta del modelo tardo demasiado. Intenta nuevamente en unos instantes.';
+  }
+
+  return 'No pude generar una respuesta en este momento. Intenta de nuevo en unos instantes.';
+}
+
+function getGatewayProviderOptions(
+  modelId: string,
+): GatewayByokProviderOptions | undefined {
+  if (!env.AI_GATEWAY_ENABLE_BYOK) {
+    return undefined;
+  }
+
+  const providerPrefix = modelId.split('/')[0]?.trim().toLowerCase();
+  if (!providerPrefix) {
+    return undefined;
+  }
+
+  const byok = getByokForProvider(providerPrefix);
+  if (!byok) {
+    return undefined;
+  }
+
+  return {
+    gateway: {
+      byok,
+      providerTimeouts: {
+        byok: Object.fromEntries(
+          Object.keys(byok).map(provider => [provider, providerTimeoutByokMs]),
+        ),
+      },
+    },
+  };
+}
+
+function getByokForProvider(
+  providerPrefix: string,
+): Record<string, GatewayByokCredential[]> | undefined {
+  switch (providerPrefix) {
+    case 'openai':
+      return env.BYOK_OPENAI_API_KEY
+        ? { openai: [{ apiKey: env.BYOK_OPENAI_API_KEY }] }
+        : undefined;
+    case 'anthropic':
+      return env.BYOK_ANTHROPIC_API_KEY
+        ? { anthropic: [{ apiKey: env.BYOK_ANTHROPIC_API_KEY }] }
+        : undefined;
+    case 'google':
+      return getVertexByokConfig();
+    case 'amazon':
+      return getBedrockByokConfig();
+    default:
+      return undefined;
+  }
+}
+
+function getVertexByokConfig() {
+  if (
+    !env.BYOK_VERTEX_PROJECT ||
+    !env.BYOK_VERTEX_LOCATION ||
+    !env.BYOK_VERTEX_CLIENT_EMAIL ||
+    !env.BYOK_VERTEX_PRIVATE_KEY
+  ) {
+    return undefined;
+  }
+
+  return {
+    vertex: [
+      {
+        project: env.BYOK_VERTEX_PROJECT,
+        location: env.BYOK_VERTEX_LOCATION,
+        googleCredentials: {
+          clientEmail: env.BYOK_VERTEX_CLIENT_EMAIL,
+          privateKey: env.BYOK_VERTEX_PRIVATE_KEY,
+        },
+      },
+    ],
+  };
+}
+
+function getBedrockByokConfig() {
+  if (
+    !env.BYOK_BEDROCK_ACCESS_KEY_ID ||
+    !env.BYOK_BEDROCK_SECRET_ACCESS_KEY ||
+    !env.BYOK_BEDROCK_REGION
+  ) {
+    return undefined;
+  }
+
+  return {
+    bedrock: [
+      {
+        accessKeyId: env.BYOK_BEDROCK_ACCESS_KEY_ID,
+        secretAccessKey: env.BYOK_BEDROCK_SECRET_ACCESS_KEY,
+        region: env.BYOK_BEDROCK_REGION,
+      },
+    ],
+  };
+}
+
+function createOpenRouterTextStream(
+  message: string,
+  abortSignal: AbortSignal,
+): StreamableTextResult {
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+
+  if (!apiKey) {
+    throw new Error('OPENROUTER_API_KEY is required for openrouter models');
+  }
+
+  const model = env.AI_MODEL.slice('openrouter/'.length);
+
+  const textStream = new ReadableStream<string>({
+    async start(controller) {
+      const response = await fetch(openRouterBaseUrl, {
+        method: 'POST',
+        signal: abortSignal,
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: message },
+          ],
+          stream: true,
+          temperature: 0.4,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => '');
+        throw new Error(
+          `OpenRouter upstream error (${response.status}): ${errorBody || response.statusText}`,
+        );
+      }
+
+      if (!response.body) {
+        throw new Error('OpenRouter response body is empty');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) {
+            buffer += decoder.decode();
+            processOpenRouterBuffer(buffer, controller);
+            controller.close();
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const segments = buffer.split('\n\n');
+          buffer = segments.pop() ?? '';
+
+          for (const segment of segments) {
+            processOpenRouterBuffer(segment, controller);
+          }
+        }
+      } finally {
+        await reader.cancel().catch(() => undefined);
+      }
+    },
+    async cancel(reason) {
+      abortSignal.throwIfAborted?.();
+      return Promise.resolve(reason);
+    },
+  });
+
+  return { textStream };
+}
+
+function processOpenRouterBuffer(
+  rawChunk: string,
+  controller: ReadableStreamDefaultController<string>,
+) {
+  const lines = rawChunk
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  for (const line of lines) {
+    if (!line.startsWith('data:')) {
+      continue;
+    }
+
+    const payload = line.slice(5).trim();
+
+    if (payload === '[DONE]') {
+      continue;
+    }
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(payload) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+
+    const choice = Array.isArray(parsed.choices) ? parsed.choices[0] : undefined;
+    const delta =
+      choice && typeof choice === 'object' && choice !== null
+        ? (choice as Record<string, unknown>).delta
+        : undefined;
+    const content =
+      delta && typeof delta === 'object' && delta !== null
+        ? (delta as Record<string, unknown>).content
+        : undefined;
+
+    if (typeof content === 'string' && content.length > 0) {
+      controller.enqueue(content);
+    }
+  }
+}
