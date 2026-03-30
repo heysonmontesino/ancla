@@ -38,6 +38,33 @@ void main() {
       expect(session.isOffline, isFalse);
     });
 
+    test('parsea coverUrl cuando existe en el documento', () {
+      final session = FirestoreAudioRepository.parseSessionData('session_5', {
+        'title': 'Respiracion focal',
+        'category': 'focus',
+        'durationSeconds': 240,
+        'audioSource': 'https://cdn.example.com/focus.mp3',
+        'coverUrl': ' https://cdn.example.com/focus-cover.jpg ',
+      });
+
+      expect(session, isNotNull);
+      expect(session!.coverUrl, 'https://cdn.example.com/focus-cover.jpg');
+      expect(session.coverImageUrl, 'https://cdn.example.com/focus-cover.jpg');
+    });
+
+    test('normaliza coverUrl vacio como null', () {
+      final session = FirestoreAudioRepository.parseSessionData('session_6', {
+        'title': 'Sueno profundo',
+        'category': 'sleep',
+        'durationSeconds': 480,
+        'audioSource': 'https://cdn.example.com/sleep.mp3',
+        'coverUrl': '   ',
+      });
+
+      expect(session, isNotNull);
+      expect(session!.coverUrl, isNull);
+    });
+
     test('descarta categoria no reconocida', () {
       final session = FirestoreAudioRepository.parseSessionData('session_3', {
         'title': 'Categoria invalida',

@@ -1,10 +1,4 @@
-enum SessionCategory {
-  anxiety,
-  stress,
-  sleep,
-  focus,
-  mood,
-}
+enum SessionCategory { anxiety, stress, sleep, focus, mood }
 
 /// Extensión para obtener el nombre de visualización en español
 /// y los metadatos de diseño por categoría sin polucionar el enum.
@@ -80,8 +74,8 @@ class AudioSession {
   final String audioSource;
 
   /// URL opcional de la carátula en la nube.
-  /// Si es null, se usa la carátula por defecto de la categoría.
-  final String? coverImageUrl;
+  /// Si es null, se usa una representación visual de respaldo.
+  final String? coverUrl;
 
   /// true → contenido exclusivo de suscripción premium.
   final bool isPremium;
@@ -96,12 +90,24 @@ class AudioSession {
     required this.category,
     required this.durationSeconds,
     required this.audioSource,
-    this.coverImageUrl,
+    String? coverUrl,
+    String? coverImageUrl,
     this.isPremium = false,
     this.isOffline = false,
-  });
+  }) : coverUrl = coverUrl ?? coverImageUrl;
 
   /// Compatibilidad con SessionPlayerScreen: devuelve el displayName
   /// de la categoría (antes llamado categoryDisplay).
   String get categoryDisplay => category.displayName;
+
+  /// Compatibilidad hacia atras con superficies que aun leen `coverImageUrl`.
+  String? get coverImageUrl => coverUrl;
+
+  String? get normalizedCoverUrl {
+    final value = coverUrl?.trim();
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+    return value;
+  }
 }

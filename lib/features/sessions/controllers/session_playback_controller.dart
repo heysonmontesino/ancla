@@ -155,7 +155,7 @@ class SessionPlaybackController extends BaseAudioHandler
           parameters: {
             'session_id': _currentSession?.id ?? 'unknown',
             'session_title': _currentSession?.title ?? 'Untitled',
-            'category': _currentSession?.category ?? 'none',
+            'category': _currentSession?.category.name ?? 'none',
           },
         ),
       );
@@ -501,7 +501,7 @@ class SessionPlaybackController extends BaseAudioHandler
         parameters: {
           'session_id': _currentSession?.id ?? 'unknown',
           'session_title': _currentSession?.title ?? 'Untitled',
-          'category': _currentSession?.category ?? 'none',
+          'category': _currentSession?.category.name ?? 'none',
         },
       ),
     );

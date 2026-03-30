@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -61,11 +62,9 @@ Future<bool> _ensurePremiumAccess(
   }
 
   if (context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(_premiumRequiredMessage),
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text(_premiumRequiredMessage)));
   }
   return false;
 }
@@ -134,9 +133,7 @@ class LibraryScreen extends StatelessWidget {
       floatingActionButton: FloatingActionButton.small(
         heroTag: 'sos_library',
         onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => const EmergencyScreen(),
-          ),
+          MaterialPageRoute<void>(builder: (_) => const EmergencyScreen()),
         ),
         backgroundColor: const Color(0xFF7B1A1A),
         child: const Icon(
@@ -485,6 +482,8 @@ class _CategorySection extends StatelessWidget {
 }
 
 class _SessionCard extends StatelessWidget {
+  static const double _cardRadius = 32;
+
   final AudioSession session;
 
   const _SessionCard({required this.session});
@@ -519,7 +518,7 @@ class _SessionCard extends StatelessWidget {
                 child: Ink(
                   decoration: BoxDecoration(
                     color: _librarySecondary,
-                    borderRadius: BorderRadius.circular(32),
+                    borderRadius: BorderRadius.circular(_cardRadius),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.05),
                     ),
@@ -535,40 +534,8 @@ class _SessionCard extends StatelessWidget {
                     children: [
                       Positioned.fill(
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(32),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              session.coverImageUrl != null
-                                  ? Image.network(
-                                      session.coverImageUrl!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) => 
-                                          Image.asset(
-                                            session.category.coverImagePath,
-                                            fit: BoxFit.cover,
-                                          ),
-                                    )
-                                  : Image.asset(
-                                      session.category.coverImagePath,
-                                      fit: BoxFit.cover,
-                                    ),
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Colors.transparent,
-                                      _libraryBackground.withValues(
-                                        alpha: 0.85,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                          borderRadius: BorderRadius.circular(_cardRadius),
+                          child: _SessionCardArtwork(session: session),
                         ),
                       ),
                       Positioned(
@@ -606,37 +573,6 @@ class _SessionCard extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                          ],
-                        ),
-                      ),
-                      Center(
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Container(
-                              width: 118,
-                              height: 118,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.06),
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              width: 90,
-                              height: 90,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _libraryPrimary.withValues(alpha: 0.12),
-                              ),
-                              child: const Icon(
-                                Icons.graphic_eq_rounded,
-                                color: _libraryForeground,
-                                size: 34,
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -705,6 +641,192 @@ class _SessionCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SessionCardArtwork extends StatelessWidget {
+  const _SessionCardArtwork({required this.session});
+
+  final AudioSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    final coverUrl = session.normalizedCoverUrl;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (coverUrl != null)
+          CachedNetworkImage(
+            imageUrl: coverUrl,
+            fit: BoxFit.cover,
+            memCacheWidth: 640,
+            fadeInDuration: const Duration(milliseconds: 180),
+            placeholderFadeInDuration: Duration.zero,
+            placeholder: (context, url) =>
+                _SessionCardPlaceholder(category: session.category),
+            errorWidget: (context, url, error) =>
+                _SessionCardFallback(session: session),
+          )
+        else
+          _SessionCardFallback(session: session),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.04),
+                Colors.transparent,
+                _libraryBackground.withValues(alpha: 0.90),
+              ],
+              stops: const [0, 0.45, 1],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SessionCardPlaceholder extends StatelessWidget {
+  const _SessionCardPlaceholder({required this.category});
+
+  final SessionCategory category;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Color(category.colorValue);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [accent.withValues(alpha: 0.92), _libraryCard],
+        ),
+      ),
+      child: Center(
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.2,
+            color: _libraryPrimary.withValues(alpha: 0.80),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SessionCardFallback extends StatelessWidget {
+  const _SessionCardFallback({required this.session});
+
+  final AudioSession session;
+
+  String get _monogram {
+    final parts = session.title
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .take(2)
+        .toList();
+
+    if (parts.isEmpty) {
+      return session.category.displayName[0].toUpperCase();
+    }
+
+    return parts.map((part) => part[0].toUpperCase()).join();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Color(session.category.colorValue);
+    final accentStrong = Color.alphaBlend(
+      _libraryPrimary.withValues(alpha: 0.12),
+      accent,
+    );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [accentStrong, _libraryCard, _libraryBackground],
+          stops: const [0, 0.62, 1],
+        ),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned(
+            top: -30,
+            right: -16,
+            child: _FallbackGlow(
+              size: 112,
+              color: Colors.white.withValues(alpha: 0.38),
+            ),
+          ),
+          Positioned(
+            left: -18,
+            bottom: 42,
+            child: _FallbackGlow(
+              size: 92,
+              color: _libraryPrimary.withValues(alpha: 0.10),
+            ),
+          ),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _monogram,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 38,
+                      fontWeight: FontWeight.w800,
+                      color: _libraryForeground.withValues(alpha: 0.82),
+                      letterSpacing: -2.2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    session.category.displayName.toUpperCase(),
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: _libraryMuted,
+                      letterSpacing: 1.8,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FallbackGlow extends StatelessWidget {
+  const _FallbackGlow({required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
       ),
     );
   }

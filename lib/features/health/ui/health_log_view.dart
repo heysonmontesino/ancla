@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -24,15 +25,27 @@ class _HealthLogViewState extends State<HealthLogView> {
   final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
   Stream<List<HealthLog>>? _logsStream;
   Future<RecommendationResult>? _recommendationFuture;
-  String? _lastKnownUid;
-  
+  StreamSubscription<User?>? _authSubscription;
+  String _activeUid = '';
   int? _selectedMood;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _logsStream = HealthRepository.watchWeeklyLogs();
+    _refreshLogsStream(uid: HealthRepository.currentUid, force: true);
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (!mounted) {
+        return;
+      }
+      _refreshLogsStream(uid: user?.uid ?? '');
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 
   final Color _background = const Color(0xFF0B0E17);

@@ -105,11 +105,12 @@ aiRouter.post(
 
     try {
       await verifyFirebaseIdToken(idToken);
-    } catch {
+    } catch (err: any) {
+      console.error('[ai/chat] Firebase token verification failed:', err);
       res
         .status(401)
         .type('text/plain; charset=utf-8')
-        .send('No autorizado.');
+        .send(`No autorizado: ${err?.message || 'Error desconocido'}`);
       return;
     }
 
@@ -227,11 +228,12 @@ aiRouter.post(
 
     try {
       await verifyFirebaseIdToken(idToken);
-    } catch {
+    } catch (err: any) {
+      console.error('[ai/chat] Firebase token verification failed:', err);
       res
         .status(401)
         .type('text/plain; charset=utf-8')
-        .send('No autorizado.');
+        .send(`No autorizado (Chat Auth Error): ${err?.message || 'Error desconocido'}`);
       return;
     }
 

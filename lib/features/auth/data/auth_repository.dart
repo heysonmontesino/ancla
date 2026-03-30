@@ -91,11 +91,12 @@ class AuthRepository {
       // Delete main user document
       batch.delete(db.collection('users').doc(uid));
 
-      await batch.commit();
-
-      // 2. Delete Auth user
+      // 2. Delete Auth user first (may throw requires-recent-login)
       await user.delete();
       await _googleSignIn.signOut();
+
+      // 3. Only delete Firestore data after Auth deletion succeeds
+      await batch.commit();
     } on FirebaseAuthException catch (e) {
       if (e.code == 'requires-recent-login') {
         if (kDebugMode) debugPrint('[AuthRepo] Re-authentication required for deletion.');

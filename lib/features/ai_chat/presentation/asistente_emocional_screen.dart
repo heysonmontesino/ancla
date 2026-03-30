@@ -272,6 +272,11 @@ class _AsistenteEmocionalScreenState extends State<AsistenteEmocionalScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _aiChatForeground),
+          onPressed: () => Navigator.of(context).maybePop(),
+          tooltip: 'Regresar',
+        ),
         actions: [
           IconButton(
             onPressed: _isCheckingConnection ? null : _testConnection,
@@ -284,7 +289,7 @@ class _AsistenteEmocionalScreenState extends State<AsistenteEmocionalScreen> {
                       color: _aiChatForeground,
                     ),
                   )
-                : const Icon(Icons.network_check_rounded),
+                : const Icon(Icons.network_check_rounded, color: _aiChatForeground),
             tooltip: 'Probar conexión',
           ),
         ],

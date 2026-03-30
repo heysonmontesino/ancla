@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart' show debugPrint, kDebugMode, visibleForTesting;
+import 'package:flutter/foundation.dart'
+    show debugPrint, kDebugMode, visibleForTesting;
 import '../models/audio_session.dart';
 
 /// Repositorio de producción que lee la colección `sessions` en Cloud Firestore.
@@ -11,6 +12,7 @@ import '../models/audio_session.dart';
 ///   "category":        "anxiety",        // valor del enum SessionCategory
 ///   "durationSeconds": 180,
 ///   "audioSource":     "https://...",    // URL HTTPS o "assets/audio/xxx.mp3"
+///   "coverUrl":        "https://...",    // opcional
 ///   "isPremium":       false,
 ///   "isOffline":       false
 /// }
@@ -88,12 +90,17 @@ class FirestoreAudioRepository {
       final categoryStr = data['category'] as String;
       final isPremium = (data['isPremium'] as bool?) ?? false;
       final isOffline = (data['isOffline'] as bool?) ?? false;
-      final coverImageUrl =
-          (data['coverImageUrl'] as String?) ?? (data['imageUrl'] as String?);
+      final coverUrl = _readOptionalString(data, const [
+        'coverUrl',
+        'coverImageUrl',
+        'imageUrl',
+      ]);
 
       // Mapea el string del campo `category` al enum tipado
       final category = _parseCategory(categoryStr);
-      if (category == null) return null;
+      if (category == null) {
+        return null;
+      }
 
       return AudioSession(
         id: documentId,
@@ -101,13 +108,15 @@ class FirestoreAudioRepository {
         category: category,
         durationSeconds: durationSeconds,
         audioSource: audioSource,
-        coverImageUrl: coverImageUrl,
+        coverUrl: coverUrl,
         isPremium: isPremium,
         isOffline: isOffline,
       );
     } catch (e) {
       // Documento mal formado: lo ignoramos en lugar de romper el stream.
-      if (kDebugMode) debugPrint('[FirestoreRepo] doc $documentId descartado — $e');
+      if (kDebugMode) {
+        debugPrint('[FirestoreRepo] doc $documentId descartado — $e');
+      }
       return null;
     }
   }
@@ -128,5 +137,24 @@ class FirestoreAudioRepository {
       default:
         return null;
     }
+  }
+
+  static String? _readOptionalString(
+    Map<String, dynamic> data,
+    List<String> keys,
+  ) {
+    for (final key in keys) {
+      final value = data[key];
+      if (value is! String) {
+        continue;
+      }
+
+      final normalized = value.trim();
+      if (normalized.isNotEmpty) {
+        return normalized;
+      }
+    }
+
+    return null;
   }
 }
