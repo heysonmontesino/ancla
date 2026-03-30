@@ -10,6 +10,7 @@ import {
   rebuildTextStreamFromProbe,
   containsAcuteRiskLanguage,
   createTherapeuticTextStream,
+  getAiErrorDiagnostics,
   generateStructuredObject,
   getAcuteRiskReply,
   getAmbiguousRiskReply,
@@ -110,7 +111,7 @@ aiRouter.post(
       res
         .status(401)
         .type('text/plain; charset=utf-8')
-        .send(`No autorizado: ${err?.message || 'Error desconocido'}`);
+        .send('No autorizado.');
       return;
     }
 
@@ -126,6 +127,10 @@ aiRouter.post(
     }
 
     const { message } = parsedBody.data;
+    const provider = process.env.AI_MODEL?.trim().startsWith('openrouter/')
+        ? 'openrouter'
+        : 'gateway';
+    const model = process.env.AI_MODEL?.trim() ?? 'unknown';
 
     if (
       containsAcuteRiskLanguage(message) ||
@@ -152,6 +157,8 @@ aiRouter.post(
     }
 
     const abortController = new AbortController();
+    const streamStartedAt = Date.now();
+    let hasStreamedFirstChunk = false;
     const abortStream = () => abortController.abort('client disconnected');
     const cleanup = () => {
       req.off('close', abortStream);
@@ -167,6 +174,30 @@ aiRouter.post(
     res.on('finish', cleanup);
     res.on('error', cleanup);
 
+    console.log('[ai/chat] request started', {
+      provider,
+      model,
+      messageLength: message.length,
+    });
+
+    res.on('finish', () => {
+      console.log('[ai/chat] response finished', {
+        provider,
+        model,
+        elapsedMs: Date.now() - streamStartedAt,
+        hadFirstChunk: hasStreamedFirstChunk,
+      });
+    });
+
+    res.on('close', () => {
+      console.log('[ai/chat] response closed', {
+        provider,
+        model,
+        elapsedMs: Date.now() - streamStartedAt,
+        hadFirstChunk: hasStreamedFirstChunk,
+      });
+    });
+
     try {
       req.setTimeout(25_000);
       res.setTimeout(25_000);
@@ -179,6 +210,11 @@ aiRouter.post(
       const streamProbe = await probeTextStream(result);
 
       if (streamProbe.firstChunk.done) {
+        console.warn('[ai/chat] stream finished without content', {
+          provider,
+          model,
+          elapsedMs: Date.now() - streamStartedAt,
+        });
         cleanup();
         res
           .status(502)
@@ -188,6 +224,14 @@ aiRouter.post(
           );
         return;
       }
+
+      hasStreamedFirstChunk = true;
+      console.log('[ai/chat] first chunk ready', {
+        provider,
+        model,
+        elapsedMs: Date.now() - streamStartedAt,
+        firstChunkLength: streamProbe.firstChunk.value.length,
+      });
 
       pipeTextStreamToResponse({
         response: res,
@@ -199,7 +243,22 @@ aiRouter.post(
       });
     } catch (error) {
       cleanup();
-      console.error('[ai/chat] stream failure', error);
+      const diagnostics = getAiErrorDiagnostics(error);
+      console.error('[ai/chat] stream failure', {
+        provider: diagnostics.provider,
+        model: diagnostics.model,
+        category: diagnostics.category,
+        upstreamStatus: diagnostics.upstreamStatus,
+        isTimeout: diagnostics.isTimeout,
+        isRateLimit: diagnostics.isRateLimit,
+        isAuth: diagnostics.isAuth,
+        isModelUnavailable: diagnostics.isModelUnavailable,
+        message: diagnostics.message,
+        stack:
+          error instanceof Error
+            ? error.stack?.split('\n').slice(0, 6).join('\n')
+            : undefined,
+      });
 
       if (!res.headersSent) {
         res
@@ -229,11 +288,11 @@ aiRouter.post(
     try {
       await verifyFirebaseIdToken(idToken);
     } catch (err: any) {
-      console.error('[ai/chat] Firebase token verification failed:', err);
+      console.error('[ai/recommendation] Firebase token verification failed:', err);
       res
         .status(401)
         .type('text/plain; charset=utf-8')
-        .send(`No autorizado (Chat Auth Error): ${err?.message || 'Error desconocido'}`);
+        .send('No autorizado.');
       return;
     }
 
@@ -271,7 +330,22 @@ aiRouter.post(
 
       res.status(200).json(recommendation);
     } catch (error) {
-      console.error('[ai/recommendation] failure', error);
+      const diagnostics = getAiErrorDiagnostics(error);
+      console.error('[ai/recommendation] failure', {
+        provider: diagnostics.provider,
+        model: diagnostics.model,
+        category: diagnostics.category,
+        upstreamStatus: diagnostics.upstreamStatus,
+        isTimeout: diagnostics.isTimeout,
+        isRateLimit: diagnostics.isRateLimit,
+        isAuth: diagnostics.isAuth,
+        isModelUnavailable: diagnostics.isModelUnavailable,
+        message: diagnostics.message,
+        stack:
+          error instanceof Error
+            ? error.stack?.split('\n').slice(0, 6).join('\n')
+            : undefined,
+      });
       res
         .status(503)
         .type('text/plain; charset=utf-8')

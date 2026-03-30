@@ -49,6 +49,58 @@ type StreamableTextResult = {
   textStream: ReadableStream<string>;
 };
 
+type AiErrorCategory =
+  | 'auth'
+  | 'rate_limit'
+  | 'timeout'
+  | 'model_unavailable'
+  | 'invalid_request'
+  | 'network'
+  | 'empty_response'
+  | 'unknown';
+
+type AiErrorDiagnostics = {
+  provider: string;
+  model: string;
+  category: AiErrorCategory;
+  upstreamStatus: number | null;
+  message: string;
+  isTimeout: boolean;
+  isRateLimit: boolean;
+  isAuth: boolean;
+  isModelUnavailable: boolean;
+};
+
+class AiProviderError extends Error {
+  readonly provider: string;
+  readonly model: string;
+  readonly category: AiErrorCategory;
+  readonly upstreamStatus: number | null;
+
+  constructor({
+    provider,
+    model,
+    category,
+    upstreamStatus = null,
+    message,
+    cause,
+  }: {
+    provider: string;
+    model: string;
+    category: AiErrorCategory;
+    upstreamStatus?: number | null;
+    message: string;
+    cause?: unknown;
+  }) {
+    super(message, { cause });
+    this.name = 'AiProviderError';
+    this.provider = provider;
+    this.model = model;
+    this.category = category;
+    this.upstreamStatus = upstreamStatus;
+  }
+}
+
 const providerTimeoutByokMs = 15_000;
 const openRouterBaseUrl = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -194,12 +246,8 @@ export function rebuildTextStreamFromProbe({
 }
 
 export function getUpstreamErrorMessage(error: unknown): string {
-  const rawMessage =
-    error instanceof Error
-      ? error.message
-      : typeof error === 'string'
-        ? error
-        : JSON.stringify(error);
+  const diagnostics = getAiErrorDiagnostics(error);
+  const rawMessage = diagnostics.message;
 
   const normalized = rawMessage.toLowerCase();
 
@@ -236,6 +284,40 @@ export function getUpstreamErrorMessage(error: unknown): string {
   }
 
   return 'No pude generar una respuesta en este momento. Intenta de nuevo en unos instantes.';
+}
+
+export function getAiErrorDiagnostics(error: unknown): AiErrorDiagnostics {
+  const rawMessage =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : JSON.stringify(error);
+
+  const provider =
+    error instanceof AiProviderError ? error.provider : inferProviderFromError(rawMessage);
+  const model =
+    error instanceof AiProviderError ? error.model : env.AI_MODEL;
+  const upstreamStatus =
+    error instanceof AiProviderError ? error.upstreamStatus : inferStatusCode(rawMessage);
+  const normalized = rawMessage.toLowerCase();
+
+  const category =
+    error instanceof AiProviderError
+      ? error.category
+      : inferErrorCategory(normalized, upstreamStatus);
+
+  return {
+    provider,
+    model,
+    category,
+    upstreamStatus,
+    message: rawMessage,
+    isTimeout: category === 'timeout',
+    isRateLimit: category === 'rate_limit',
+    isAuth: category === 'auth',
+    isModelUnavailable: category === 'model_unavailable',
+  };
 }
 
 function getGatewayProviderOptions(
@@ -337,69 +419,102 @@ function createOpenRouterTextStream(
   abortSignal: AbortSignal,
 ): StreamableTextResult {
   const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+  const provider = 'openrouter';
+  const configuredModel = env.AI_MODEL;
 
   if (!apiKey) {
-    throw new Error('OPENROUTER_API_KEY is required for openrouter models');
+    throw new AiProviderError({
+      provider,
+      model: configuredModel,
+      category: 'auth',
+      message: 'OPENROUTER_API_KEY is required for openrouter models',
+    });
   }
 
-  const model = env.AI_MODEL.slice('openrouter/'.length);
+  const model = getOpenRouterApiModel(configuredModel);
 
   const textStream = new ReadableStream<string>({
     async start(controller) {
-      const response = await fetch(openRouterBaseUrl, {
-        method: 'POST',
-        signal: abortSignal,
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: message },
-          ],
-          stream: true,
-          temperature: 0.4,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.text().catch(() => '');
-        throw new Error(
-          `OpenRouter upstream error (${response.status}): ${errorBody || response.statusText}`,
-        );
-      }
-
-      if (!response.body) {
-        throw new Error('OpenRouter response body is empty');
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
       try {
-        while (true) {
-          const { done, value } = await reader.read();
+        const response = await fetch(openRouterBaseUrl, {
+          method: 'POST',
+          signal: abortSignal,
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: message },
+            ],
+            stream: true,
+            temperature: 0.4,
+          }),
+        });
 
-          if (done) {
-            buffer += decoder.decode();
-            processOpenRouterBuffer(buffer, controller);
-            controller.close();
-            break;
-          }
-
-          buffer += decoder.decode(value, { stream: true });
-          const segments = buffer.split('\n\n');
-          buffer = segments.pop() ?? '';
-
-          for (const segment of segments) {
-            processOpenRouterBuffer(segment, controller);
-          }
+        if (!response.ok) {
+          const errorBody = await response.text().catch(() => '');
+          throw new AiProviderError({
+            provider,
+            model: configuredModel,
+            category: inferErrorCategory(errorBody.toLowerCase(), response.status),
+            upstreamStatus: response.status,
+            message: `OpenRouter upstream error (${response.status}): ${errorBody || response.statusText}`,
+          });
         }
-      } finally {
-        await reader.cancel().catch(() => undefined);
+
+        if (!response.body) {
+          throw new AiProviderError({
+            provider,
+            model: configuredModel,
+            category: 'empty_response',
+            message: 'OpenRouter response body is empty',
+          });
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+
+            if (done) {
+              buffer += decoder.decode();
+              processOpenRouterBuffer(buffer, controller);
+              controller.close();
+              break;
+            }
+
+            buffer += decoder.decode(value, { stream: true });
+            const segments = buffer.split('\n\n');
+            buffer = segments.pop() ?? '';
+
+            for (const segment of segments) {
+              processOpenRouterBuffer(segment, controller);
+            }
+          }
+        } finally {
+          await reader.cancel().catch(() => undefined);
+        }
+      } catch (error) {
+        if (error instanceof AiProviderError) {
+          throw error;
+        }
+
+        throw new AiProviderError({
+          provider,
+          model: configuredModel,
+          category: inferErrorCategory(
+            error instanceof Error ? error.message.toLowerCase() : '',
+            null,
+          ),
+          message: error instanceof Error ? error.message : String(error),
+          cause: error,
+        });
       }
     },
     async cancel(reason) {
@@ -409,6 +524,103 @@ function createOpenRouterTextStream(
   });
 
   return { textStream };
+}
+
+function inferProviderFromError(message: string): string {
+  const normalized = message.toLowerCase();
+  if (normalized.includes('openrouter')) {
+    return 'openrouter';
+  }
+
+  return env.AI_MODEL.split('/')[0] ?? 'unknown';
+}
+
+function getOpenRouterApiModel(configuredModel: string): string {
+  const trimmed = configuredModel.trim();
+  if (trimmed === 'openrouter/auto') {
+    return trimmed;
+  }
+
+  return trimmed.slice('openrouter/'.length).trim();
+}
+
+function inferStatusCode(message: string): number | null {
+  const match = message.match(/\((\d{3})\)/);
+  if (!match) {
+    return null;
+  }
+
+  return Number(match[1]);
+}
+
+function inferErrorCategory(
+  normalizedMessage: string,
+  upstreamStatus: number | null,
+): AiErrorCategory {
+  if (
+    upstreamStatus === 401 ||
+    upstreamStatus === 403 ||
+    normalizedMessage.includes('invalid api key') ||
+    normalizedMessage.includes('authentication') ||
+    normalizedMessage.includes('unauthorized') ||
+    normalizedMessage.includes('forbidden')
+  ) {
+    return 'auth';
+  }
+
+  if (
+    upstreamStatus === 429 ||
+    normalizedMessage.includes('rate limit') ||
+    normalizedMessage.includes('too many requests')
+  ) {
+    return 'rate_limit';
+  }
+
+  if (
+    upstreamStatus === 408 ||
+    upstreamStatus === 504 ||
+    normalizedMessage.includes('timeout') ||
+    normalizedMessage.includes('timed out') ||
+    normalizedMessage.includes('aborted')
+  ) {
+    return 'timeout';
+  }
+
+  if (
+    upstreamStatus === 404 ||
+    normalizedMessage.includes('no endpoints found') ||
+    normalizedMessage.includes('model not found') ||
+    normalizedMessage.includes('model is not available') ||
+    normalizedMessage.includes('provider returned no endpoints') ||
+    normalizedMessage.includes('unknown model')
+  ) {
+    return 'model_unavailable';
+  }
+
+  if (
+    upstreamStatus === 400 ||
+    normalizedMessage.includes('bad request') ||
+    normalizedMessage.includes('invalid request') ||
+    normalizedMessage.includes('invalid payload')
+  ) {
+    return 'invalid_request';
+  }
+
+  if (
+    normalizedMessage.includes('network') ||
+    normalizedMessage.includes('fetch failed') ||
+    normalizedMessage.includes('ecconnreset') ||
+    normalizedMessage.includes('enotfound') ||
+    normalizedMessage.includes('econnrefused')
+  ) {
+    return 'network';
+  }
+
+  if (normalizedMessage.includes('response body is empty')) {
+    return 'empty_response';
+  }
+
+  return 'unknown';
 }
 
 function processOpenRouterBuffer(

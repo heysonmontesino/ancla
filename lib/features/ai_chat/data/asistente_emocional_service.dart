@@ -22,15 +22,22 @@ class AsistenteEmocionalService {
   AsistenteEmocionalService({HttpClient? httpClient, String? baseUrl})
     : _httpClient = httpClient ?? HttpClient(),
       _baseUrl = baseUrl ?? _defaultBaseUrl {
-    print('[AsistenteEmocionalService] Initialized with baseUrl: "${_baseUrl.isEmpty ? '(EMPTY)' : _baseUrl}"');
+    debugPrint(
+      '[AsistenteEmocionalService] Initialized with baseUrl: "${_baseUrl.isEmpty ? '(EMPTY)' : _baseUrl}"',
+    );
     if (_baseUrl.isEmpty && !kReleaseMode) {
-      print('[AsistenteEmocionalService] WARNING: AI_CHAT_BASE_URL is not set. Use --dart-define=AI_CHAT_BASE_URL=... at compile time.');
+      debugPrint(
+        '[AsistenteEmocionalService] WARNING: AI_CHAT_BASE_URL is not set. Use --dart-define=AI_CHAT_BASE_URL=... at compile time.',
+      );
     }
   }
 
   static const String _defaultBaseUrl = String.fromEnvironment(
     'AI_CHAT_BASE_URL',
   );
+  static const Duration _requestTimeout = Duration(seconds: 15);
+  static const Duration _chatHeadersTimeout = Duration(seconds: 70);
+  static const Duration _chatStreamInactivityTimeout = Duration(seconds: 25);
 
   /// Verdadero si el build incluyó --dart-define=AI_CHAT_BASE_URL con un valor.
   static bool get isConfigured => _defaultBaseUrl.isNotEmpty;
@@ -71,32 +78,44 @@ class AsistenteEmocionalService {
 
   Stream<String> streamReply(String message) async* {
     final String idToken = await _requireIdToken();
-    
+    final Stopwatch stopwatch = Stopwatch()..start();
+    bool hasReceivedFirstChunk = false;
+    bool hasReceivedAnyChunk = false;
+    int totalChars = 0;
+
     // Sanitize baseUrl to avoid double slashes
-    final String sanitizedBaseUrl = _baseUrl.endsWith('/') 
-        ? _baseUrl.substring(0, _baseUrl.length - 1) 
+    final String sanitizedBaseUrl = _baseUrl.endsWith('/')
+        ? _baseUrl.substring(0, _baseUrl.length - 1)
         : _baseUrl;
-        
+
     final Uri endpoint = Uri.parse('$sanitizedBaseUrl/api/ai/chat');
-    print('[AsistenteEmocionalService] Request URL: $endpoint');
+    debugPrint(
+      '[AsistenteEmocionalService] Chat request started: endpoint=$endpoint messageLength=${message.length}',
+    );
 
     try {
-      final HttpClientRequest request = await _httpClient.postUrl(endpoint).timeout(
-        const Duration(seconds: 30),
-      );
+      final HttpClientRequest request = await _httpClient
+          .postUrl(endpoint)
+          .timeout(const Duration(seconds: 30));
       request.headers.contentType = ContentType.json;
       request.headers.set(HttpHeaders.acceptHeader, 'text/plain');
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $idToken');
-      request.add(utf8.encode(jsonEncode(<String, String>{'message': message})));
+      request.add(
+        utf8.encode(jsonEncode(<String, String>{'message': message})),
+      );
 
-      final HttpClientResponse response = await request.close();
-      print('[AsistenteEmocionalService] Response Status: ${response.statusCode}');
+      final HttpClientResponse response = await request.close().timeout(
+        _chatHeadersTimeout,
+      );
+      debugPrint(
+        '[AsistenteEmocionalService] Chat headers received: status=${response.statusCode} elapsedMs=${stopwatch.elapsedMilliseconds}',
+      );
 
       final Stream<String> decodedStream = response.transform(utf8.decoder);
 
       if (response.statusCode != HttpStatus.ok) {
         final String errorBody = (await decodedStream.join()).trim();
-        print('[AsistenteEmocionalService] Error body: $errorBody');
+        debugPrint('[AsistenteEmocionalService] Chat error body: $errorBody');
         throw AsistenteEmocionalException(
           errorBody.isNotEmpty
               ? errorBody
@@ -105,13 +124,35 @@ class AsistenteEmocionalService {
         );
       }
 
-      await for (final String chunk in decodedStream) {
+      await for (final String chunk in decodedStream.timeout(
+        _chatStreamInactivityTimeout,
+        onTimeout: (EventSink<String> sink) {
+          sink.addError(
+            const AsistenteEmocionalException(
+              'El asistente tardó demasiado en completar la respuesta. Intenta de nuevo.',
+            ),
+          );
+        },
+      )) {
         if (chunk.isNotEmpty) {
+          hasReceivedAnyChunk = true;
+          totalChars += chunk.length;
+          if (!hasReceivedFirstChunk) {
+            hasReceivedFirstChunk = true;
+            debugPrint(
+              '[AsistenteEmocionalService] First chat chunk received: elapsedMs=${stopwatch.elapsedMilliseconds} chunkLength=${chunk.length}',
+            );
+          }
           yield chunk;
         }
       }
+      debugPrint(
+        '[AsistenteEmocionalService] Chat stream completed: elapsedMs=${stopwatch.elapsedMilliseconds} receivedAnyChunk=$hasReceivedAnyChunk totalChars=$totalChars',
+      );
     } catch (e) {
-      print('[AsistenteEmocionalService] Stream Exception: $e');
+      debugPrint(
+        '[AsistenteEmocionalService] Chat stream failed: elapsedMs=${stopwatch.elapsedMilliseconds} receivedFirstChunk=$hasReceivedFirstChunk error=$e',
+      );
       rethrow;
     }
   }
@@ -120,11 +161,16 @@ class AsistenteEmocionalService {
     RecommendationContext context,
   ) async {
     final String idToken = await _requireIdToken();
-    final Uri endpoint = Uri.parse('$_baseUrl/api/ai/recommendation');
-    print('[AsistenteEmocionalService] Request URL: $endpoint');
+    final String sanitizedBaseUrl = _baseUrl.endsWith('/')
+        ? _baseUrl.substring(0, _baseUrl.length - 1)
+        : _baseUrl;
+    final Uri endpoint = Uri.parse('$sanitizedBaseUrl/api/ai/recommendation');
+    debugPrint('[AsistenteEmocionalService] Request URL: $endpoint');
 
     try {
-      final HttpClientRequest request = await _httpClient.postUrl(endpoint);
+      final HttpClientRequest request = await _httpClient
+          .postUrl(endpoint)
+          .timeout(_requestTimeout);
       request.headers.contentType = ContentType.json;
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $idToken');
@@ -132,14 +178,22 @@ class AsistenteEmocionalService {
         utf8.encode(jsonEncode(<String, dynamic>{'context': context.toJson()})),
       );
 
-      final HttpClientResponse response = await request.close();
-      print('[AsistenteEmocionalService] Response Status: ${response.statusCode}');
+      final HttpClientResponse response = await request.close().timeout(
+        _requestTimeout,
+      );
+      debugPrint(
+        '[AsistenteEmocionalService] Response Status: ${response.statusCode}',
+      );
 
-      final String responseBody = (await response.transform(utf8.decoder).join())
-          .trim();
+      final String responseBody =
+          (await response
+                  .transform(utf8.decoder)
+                  .join()
+                  .timeout(_requestTimeout))
+              .trim();
 
       if (response.statusCode != HttpStatus.ok) {
-        print('[AsistenteEmocionalService] Error body: $responseBody');
+        debugPrint('[AsistenteEmocionalService] Error body: $responseBody');
         throw AsistenteEmocionalException(
           responseBody.isNotEmpty
               ? responseBody
@@ -155,13 +209,13 @@ class AsistenteEmocionalService {
         }
         return RecommendationResult.fromJson(decoded);
       } catch (error) {
-        print('[AsistenteEmocionalService] JSON Decode Error: $error');
+        debugPrint('[AsistenteEmocionalService] JSON Decode Error: $error');
         throw AsistenteEmocionalException(
           'La recomendacion estructurada no se pudo interpretar: $error',
         );
       }
     } catch (e) {
-      print('[AsistenteEmocionalService] Recommendation Exception: $e');
+      debugPrint('[AsistenteEmocionalService] Recommendation Exception: $e');
       rethrow;
     }
   }
