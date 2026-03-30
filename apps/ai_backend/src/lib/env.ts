@@ -88,7 +88,11 @@ export const env = {
   AI_MODEL: parsedEnv.AI_MODEL.trim(),
   FIREBASE_PROJECT_ID: parsedEnv.FIREBASE_PROJECT_ID.trim(),
   FIREBASE_CLIENT_EMAIL: parsedEnv.FIREBASE_CLIENT_EMAIL.trim(),
-  FIREBASE_PRIVATE_KEY: parsedEnv.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+  FIREBASE_PRIVATE_KEY: parsedEnv.FIREBASE_PRIVATE_KEY
+    .trim()
+    .replace(/^["']/, '') // Remove leading quotes
+    .replace(/["']$/, '') // Remove trailing quotes
+    .replace(/\\n/g, '\n'), // Replace literal \n with real newlines
   AI_GATEWAY_ENABLE_BYOK: parseBooleanFlag(parsedEnv.AI_GATEWAY_ENABLE_BYOK),
   BYOK_OPENAI_API_KEY: optionalSecret(parsedEnv.BYOK_OPENAI_API_KEY),
   BYOK_ANTHROPIC_API_KEY: optionalSecret(parsedEnv.BYOK_ANTHROPIC_API_KEY),

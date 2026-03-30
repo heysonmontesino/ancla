@@ -1,18 +1,20 @@
 import 'dart:async';
+
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../../../core/theme.dart';
+import '../../../widgets/crisis_footer.dart';
 import '../../games/ui/games_screen.dart';
 import '../../sessions/ui/library_screen.dart';
 import '../../sessions/ui/session_player_screen.dart';
 import '../data/health_repository.dart';
-import '../data/recommendation_service.dart';
 import '../data/models/health_log.dart';
 import '../data/models/recommendation_result.dart';
-import '../../../core/theme.dart';
-import '../../../widgets/crisis_footer.dart';
+import '../data/recommendation_service.dart';
 
 class HealthLogView extends StatefulWidget {
   const HealthLogView({super.key});
@@ -29,6 +31,11 @@ class _HealthLogViewState extends State<HealthLogView> {
   String _activeUid = '';
   int? _selectedMood;
   bool _isSaving = false;
+
+  final Color _background = const Color(0xFF0B0E17);
+  final Color _cardColor = const Color(0xFF161B26);
+  final Color _primary = AppColors.primary;
+  final Color _accent = AppColors.accent;
 
   @override
   void initState() {
@@ -48,11 +55,6 @@ class _HealthLogViewState extends State<HealthLogView> {
     super.dispose();
   }
 
-  final Color _background = const Color(0xFF0B0E17);
-  final Color _cardColor = const Color(0xFF161B26);
-  final Color _primary = AppColors.primary;
-  final Color _accent = AppColors.accent;
-
   String _getMoodLabel(int mood) {
     switch (mood) {
       case -1:
@@ -68,31 +70,45 @@ class _HealthLogViewState extends State<HealthLogView> {
 
   @override
   Widget build(BuildContext context) {
-    // AUTO-RECOVERY: Si el UID cambió (por ejemplo, tras login anónimo tardío),
-    // recreamos el stream para que la gráfica no se muestre vacía por error de timing.
-    final currentUid = HealthRepository.currentUid;
-    if (_lastKnownUid != currentUid && currentUid.isNotEmpty) {
-      _lastKnownUid = currentUid;
-      _logsStream = HealthRepository.watchWeeklyLogs();
-    }
-
     return Scaffold(
       backgroundColor: _background,
       body: StreamBuilder<List<HealthLog>>(
         stream: _logsStream,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
           if (snapshot.hasError) {
-            if (kDebugMode) debugPrint('[HealthLogView] Stream error: ${snapshot.error}');
-          }
-          final logs = snapshot.data ?? [];
-          
-          String getFormattedId(DateTime d) =>
-              '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+            if (kDebugMode) {
+              debugPrint('[HealthLogView] Stream error: ${snapshot.error}');
+            }
 
-          final todayId = getFormattedId(DateTime.now());
+            return _buildScaffoldContent(
+              checkInContent: _buildCheckInCard(
+                alreadyCheckedIn: false,
+                selectedMood: _selectedMood,
+              ),
+              chartContent: _buildChartStateCard(
+                icon: Icons.cloud_off_rounded,
+                title: 'No pudimos cargar tu bitácora',
+                message:
+                    'Verifica tu conexión e inténtalo de nuevo en un momento.',
+              ),
+              recommendationContent: _buildRecommendationUnavailableState(),
+            );
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
+            return _buildScaffoldContent(
+              checkInContent: _buildCheckInCard(
+                alreadyCheckedIn: false,
+                selectedMood: _selectedMood,
+              ),
+              chartContent: const _CenteredProgressCard(),
+              recommendationContent: _buildRecommendationLoadingState(),
+            );
+          }
+
+          final logs = snapshot.data ?? [];
+          final todayId = _formatDateId(DateTime.now());
           final todayLog = logs.firstWhere(
             (l) => l.id == todayId,
             orElse: () => HealthLog(
@@ -104,61 +120,92 @@ class _HealthLogViewState extends State<HealthLogView> {
           );
 
           final bool alreadyCheckedIn = todayLog.moodScore != MoodScale.unknown;
-          if (alreadyCheckedIn && _selectedMood == null) {
-            _selectedMood = todayLog.moodScore;
-          }
+          final int? effectiveSelectedMood =
+              _selectedMood ?? (alreadyCheckedIn ? todayLog.moodScore : null);
 
-          return SafeArea(
-            bottom: false,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 120),
-            children: [
-              // 1. HEADER
-              Text(
-                'Bitácora de Coherencia',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '¿Cómo te sientes hoy?',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
-                  color: Colors.white.withValues(alpha: 0.8), 
-                ),
-              ),
-              const SizedBox(height: 40),
-
-              // 2. CHECK-IN DIARIO
-              _buildCheckInCard(alreadyCheckedIn, logs),
-              const SizedBox(height: 32),
-
-              if (snapshot.connectionState == ConnectionState.waiting && logs.isEmpty)
-                const SizedBox(
-                  height: 200,
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else
-                _buildChartSection(logs),
-              const SizedBox(height: 32),
-
-              // 4. RECOMENDACIÓN IA
-              _buildAiRecommendation(logs),
-              const SizedBox(height: 48),
-              const CrisisFooter(),
-            ],
-          ),
-        );
-      },
+          return _buildScaffoldContent(
+            checkInContent: _buildCheckInCard(
+              alreadyCheckedIn: alreadyCheckedIn,
+              selectedMood: effectiveSelectedMood,
+            ),
+            chartContent: logs.isEmpty
+                ? _buildChartStateCard(
+                    icon: Icons.insights_outlined,
+                    title: 'Aún no hay registros',
+                    message:
+                        'Guarda tu estado de hoy para empezar a ver tu tendencia semanal.',
+                  )
+                : _buildChartSection(logs),
+            recommendationContent: _buildAiRecommendation(logs),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildCheckInCard(bool alreadyCheckedIn, List<HealthLog> logs) {
+  void _refreshLogsStream({required String uid, bool force = false}) {
+    final normalizedUid = uid.trim();
+    if (!force && normalizedUid == _activeUid) {
+      return;
+    }
+
+    _activeUid = normalizedUid;
+
+    setState(() {
+      _logsStream = HealthRepository.watchWeeklyLogs();
+      _recommendationFuture = null;
+      _selectedMood = null;
+    });
+  }
+
+  String _formatDateId(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildScaffoldContent({
+    required Widget checkInContent,
+    required Widget chartContent,
+    required Widget recommendationContent,
+  }) {
+    return SafeArea(
+      bottom: false,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 120),
+        children: [
+          Text(
+            'Bitácora de Coherencia',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '¿Cómo te sientes hoy?',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 16,
+              color: Colors.white.withValues(alpha: 0.8),
+            ),
+          ),
+          const SizedBox(height: 40),
+          checkInContent,
+          const SizedBox(height: 32),
+          chartContent,
+          const SizedBox(height: 32),
+          recommendationContent,
+          const SizedBox(height: 48),
+          const CrisisFooter(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCheckInCard({
+    required bool alreadyCheckedIn,
+    required int? selectedMood,
+  }) {
     return Column(
       children: [
         Container(
@@ -177,21 +224,21 @@ class _HealthLogViewState extends State<HealthLogView> {
                     mood: -1,
                     emoji: '😢',
                     label: 'Mal',
-                    isSelected: _selectedMood == -1,
+                    isSelected: selectedMood == -1,
                     onTap: () => setState(() => _selectedMood = -1),
                   ),
                   _MoodItem(
                     mood: 0,
                     emoji: '😐',
                     label: 'Regular',
-                    isSelected: _selectedMood == 0,
+                    isSelected: selectedMood == 0,
                     onTap: () => setState(() => _selectedMood = 0),
                   ),
                   _MoodItem(
                     mood: 1,
                     emoji: '😊',
                     label: 'Bien',
-                    isSelected: _selectedMood == 1,
+                    isSelected: selectedMood == 1,
                     onTap: () => setState(() => _selectedMood = 1),
                   ),
                 ],
@@ -212,9 +259,12 @@ class _HealthLogViewState extends State<HealthLogView> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: (_selectedMood == null || _isSaving || HealthRepository.currentUid.isEmpty)
+                  onPressed:
+                      (selectedMood == null ||
+                          _isSaving ||
+                          HealthRepository.currentUid.isEmpty)
                       ? null
-                      : _saveCheckIn,
+                      : () => _saveCheckIn(selectedMood),
                   style: FilledButton.styleFrom(
                     backgroundColor: _primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -231,7 +281,11 @@ class _HealthLogViewState extends State<HealthLogView> {
                             color: Colors.white,
                           ),
                         )
-                      : Text(alreadyCheckedIn ? 'Actualizar estado' : 'Guardar estado'),
+                      : Text(
+                          alreadyCheckedIn
+                              ? 'Actualizar estado'
+                              : 'Guardar estado',
+                        ),
                 ),
               ),
             ],
@@ -241,27 +295,31 @@ class _HealthLogViewState extends State<HealthLogView> {
     );
   }
 
-  Future<void> _saveCheckIn() async {
+  Future<void> _saveCheckIn(int selectedMood) async {
     final uid = HealthRepository.currentUid;
-    if (_selectedMood == null || uid.isEmpty) return;
+    if (uid.isEmpty) {
+      return;
+    }
 
     setState(() => _isSaving = true);
 
     try {
-      await HealthRepository.saveDailyCheckIn(_selectedMood!);
+      await HealthRepository.saveDailyCheckIn(selectedMood);
 
-      if (!mounted) return;
-      
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
-        _logsStream = HealthRepository.watchWeeklyLogs();
+        _selectedMood = selectedMood;
         _recommendationFuture = null;
       });
 
       _analytics.logEvent(
         name: 'mood_saved_success',
         parameters: {
-          'mood_score': _selectedMood!,
-          'mood_label': _getMoodLabel(_selectedMood!),
+          'mood_score': selectedMood,
+          'mood_label': _getMoodLabel(selectedMood),
         },
       );
 
@@ -273,7 +331,9 @@ class _HealthLogViewState extends State<HealthLogView> {
         ),
       );
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('No pudimos guardar tu registro: $e'),
@@ -286,6 +346,7 @@ class _HealthLogViewState extends State<HealthLogView> {
       }
     }
   }
+
   Widget _buildChartSection(List<HealthLog> logs) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,28 +374,75 @@ class _HealthLogViewState extends State<HealthLogView> {
     );
   }
 
+  Widget _buildChartStateCard({
+    required IconData icon,
+    required String title,
+    required String message,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Tendencia semanal',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 24),
+        _InfoStateCard(
+          icon: icon,
+          title: title,
+          message: message,
+          backgroundColor: _cardColor,
+          accentColor: _primary,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecommendationLoadingState() {
+    return _buildRecommendationShell(
+      accentColor: _accent,
+      backgroundColors: const [Color(0xFF16231B), Color(0xFF0B120E)],
+      title: 'Recomendacion inteligente',
+      summary:
+          'Preparando una sugerencia breve con tu bitacora reciente y uso reciente de SOS.',
+      footer:
+          'Si la conexion con IA no responde, se mantiene una recomendacion local segura.',
+      child: const SizedBox(
+        height: 24,
+        width: 24,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+    );
+  }
+
+  Widget _buildRecommendationUnavailableState() {
+    return _buildRecommendationShell(
+      accentColor: _accent,
+      backgroundColors: const [Color(0xFF16231B), Color(0xFF0B120E)],
+      title: 'Recomendacion inteligente',
+      summary:
+          'No pudimos leer tu bitacora reciente para preparar una sugerencia ahora.',
+      footer:
+          'Intenta de nuevo en un momento para retomar tus recomendaciones.',
+      child: _buildLibraryButton(),
+    );
+  }
+
   Widget _buildAiRecommendation(List<HealthLog> logs) {
-    _recommendationFuture ??= RecommendationService.buildRecommendation(weeklyLogs: logs);
-    
+    _recommendationFuture ??= RecommendationService.buildRecommendation(
+      weeklyLogs: logs,
+    );
+
     return FutureBuilder<RecommendationResult>(
       future: _recommendationFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
-          return _buildRecommendationShell(
-            accentColor: _accent,
-            backgroundColors: const [Color(0xFF16231B), Color(0xFF0B120E)],
-            title: 'Recomendacion inteligente',
-            summary:
-                'Preparando una sugerencia breve con tu bitacora reciente y uso reciente de SOS.',
-            footer:
-                'Si la conexion con IA no responde, se mantiene una recomendacion local segura.',
-            child: const SizedBox(
-              height: 24,
-              width: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          );
+          return _buildRecommendationLoadingState();
         }
 
         final RecommendationResult? result = snapshot.data;
@@ -498,7 +606,7 @@ class _HealthLogViewState extends State<HealthLogView> {
             summary,
             style: GoogleFonts.plusJakartaSans(
               fontSize: 15,
-              color: Colors.white.withValues(alpha: 0.9), // Más contraste
+              color: Colors.white.withValues(alpha: 0.9),
               height: 1.5,
             ),
             maxLines: 4,
@@ -583,12 +691,15 @@ class _HealthLogViewState extends State<HealthLogView> {
   }
 
   String _getMotivationalQuote(List<HealthLog> logs) {
-    final validLogs = logs.where((l) => l.moodScore != MoodScale.unknown).toList();
+    final validLogs = logs
+        .where((l) => l.moodScore != MoodScale.unknown)
+        .toList();
     if (validLogs.isEmpty) {
       return 'Registra tu primer estado para recibir recomendaciones.';
     }
     final avg =
-        validLogs.map((l) => l.moodScore).reduce((a, b) => a + b) / validLogs.length;
+        validLogs.map((l) => l.moodScore).reduce((a, b) => a + b) /
+        validLogs.length;
     if (avg >= 0.5) {
       return '¡Qué gran semana! Mantén el ritmo con tu sesión favorita.';
     }
@@ -681,6 +792,82 @@ class _MoodItem extends StatelessWidget {
   }
 }
 
+class _CenteredProgressCard extends StatelessWidget {
+  const _CenteredProgressCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      height: 200,
+      child: Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+class _InfoStateCard extends StatelessWidget {
+  const _InfoStateCard({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.backgroundColor,
+    required this.accentColor,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final Color backgroundColor;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 200,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: accentColor, size: 24),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              color: Colors.white.withValues(alpha: 0.72),
+              height: 1.45,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _WeeklyChartPainter extends CustomPainter {
   final List<HealthLog> logs;
 
@@ -688,17 +875,13 @@ class _WeeklyChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Definimos los días de la semana
     final daysLabels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
     final now = DateTime.now();
 
-    // Usar una función local para consistencia de IDs de fecha (YYYY-MM-DD)
     String getFormattedId(DateTime d) =>
         '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
     final List<int?> scores = [];
-    // Mapear los últimos 7 días naturales terminando en hoy.
-    // Iteramos de 6 días atrás hasta hoy (0).
     for (int i = 6; i >= 0; i--) {
       final date = now.subtract(Duration(days: i));
       final dateId = getFormattedId(date);
@@ -716,16 +899,12 @@ class _WeeklyChartPainter extends CustomPainter {
 
     final double w = size.width;
     final double h = size.height;
-    
-    // Dejar márgenes laterales para que los puntos no se corten
     final double marginX = 20;
     final double chartWidth = w - (2 * marginX);
     final double stepX = chartWidth / 6;
-    
     final double centerY = h / 2;
     final double stepY = (h / 2) - 25;
 
-    // Pintar ejes guías
     final guidePaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.1)
       ..strokeWidth = 1;
@@ -771,14 +950,12 @@ class _WeeklyChartPainter extends CustomPainter {
 
     canvas.drawPath(path, linePaint);
 
-    // Pintar puntos y etiquetas
     final textPainter = TextPainter(textDirection: TextDirection.ltr);
 
     for (int i = 0; i < scores.length; i++) {
       final score = scores[i];
       final x = marginX + (i * stepX);
 
-      // Etiquetas día
       final date = now.subtract(Duration(days: 6 - i));
       final label = daysLabels[date.weekday - 1];
 
