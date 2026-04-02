@@ -10,6 +10,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
+    "test:chat-hardening": "node tests/chat-hardening.mjs",
     "test:safety": "tsx tests/run-ai-safety.ts",
     "test:auth-contract": "tsx tests/run-ai-auth-contract.ts"
   },

@@ -595,7 +595,8 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                         child: GestureDetector(
                           onTap: () => Navigator.of(context).pop(),
                           child: Container(
-                            padding: const EdgeInsets.all(8),
+                            width: 44,
+                            height: 44,
                             decoration: BoxDecoration(
                               color: Colors.transparent,
                               borderRadius: BorderRadius.circular(12),
@@ -604,10 +605,10 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                                 width: 0.5,
                               ),
                             ),
-                            child: Icon(
+                            child: const Icon(
                               Icons.chevron_left_rounded,
-                              color: Colors.white.withValues(alpha: 0.5),
-                              size: 20,
+                              color: Colors.white54,
+                              size: 24,
                             ),
                           ),
                         ),
@@ -969,7 +970,7 @@ class _ActionButton extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           decoration: BoxDecoration(
             color: const Color(0xFFEF6B73).withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
@@ -981,7 +982,7 @@ class _ActionButton extends StatelessWidget {
           child: Text(
             label,
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 11,
+              fontSize: 13,
               fontWeight: FontWeight.w700,
               color: const Color(0xFFEF6B73),
               letterSpacing: 0.5,

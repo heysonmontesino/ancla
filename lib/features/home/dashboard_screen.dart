@@ -1,6 +1,5 @@
 import 'dart:ui';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -12,9 +11,16 @@ import '../sessions/models/audio_session.dart';
 import '../sessions/ui/library_screen.dart';
 import '../sessions/ui/session_player_screen.dart';
 import '../../core/ui/widgets/organic_background.dart';
+import '../health/data/health_repository.dart';
 import '../health/ui/health_log_view.dart';
 import '../games/ui/games_screen.dart';
+import '../home/ui/ai_assistant_entry_sheet.dart';
+import '../pet/ui/pet_widget.dart';
+import '../pet/models/pet_profile.dart';
+import '../pet/providers/pet_providers.dart';
 import '../profile/ui/profile_screen.dart';
+import '../profile/data/user_profile_repository.dart';
+import '../ai_chat/presentation/asistente_emocional_screen.dart';
 import 'emergency_screen.dart';
 
 const Color _dashboardBackground = AppColors.ivory;
@@ -39,6 +45,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   late AnimationController _sosController;
   late Animation<double> _sosPulse;
   late final Stream<List<AudioSession>> _featuredSessionsStream;
+
+  static const double _hPadding = 24.0;
+  static const double _vSection = 32.0;
+  static const double _vComponent = 16.0;
 
   @override
   void initState() {
@@ -73,7 +83,47 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  Future<void> _navigateToChat() async {
+    final AiAssistantEntryResult? result =
+        await showModalBottomSheet<AiAssistantEntryResult>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          backgroundColor: AppColors.ivory,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          builder: (_) => const AiAssistantEntrySheet(),
+        );
 
+    if (!mounted || result == null) {
+      return;
+    }
+
+    switch (result.action) {
+      case AiAssistantEntryAction.openAssistant:
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder:
+                (context) => AsistenteEmocionalScreen(
+                  initialStatus: result.status,
+                ),
+          ),
+        );
+        break;
+      case AiAssistantEntryAction.openJournal:
+        setState(() => _selectedIndex = 1);
+        break;
+      case AiAssistantEntryAction.openLibrary:
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute<void>(builder: (_) => const LibraryScreen()));
+        break;
+      case AiAssistantEntryAction.openEmergency:
+        _navigateToEmergency();
+        break;
+    }
+  }
 
   void _handleNavTap(int index) {
     if (index == 0) {
@@ -96,8 +146,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       return;
     }
   }
-
-
 
   void _openAudioSession(AudioSession session) {
     Navigator.of(context).push(
@@ -174,54 +222,18 @@ class _DashboardScreenState extends State<DashboardScreen>
     return '$minutes min';
   }
 
-  String _currentUserName() {
-    final User? user = FirebaseAuth.instance.currentUser;
-    final String? displayName = user?.displayName?.trim();
-    if (displayName != null && displayName.isNotEmpty) {
-      return displayName;
-    }
-
-    final String? email = user?.email?.trim();
-    if (email != null && email.isNotEmpty) {
-      final String localPart = email.split('@').first.trim();
-      if (localPart.isNotEmpty) {
-        return localPart
-            .split(RegExp(r'[._-]+'))
-            .where((part) => part.isNotEmpty)
-            .map(_capitalizeWord)
-            .join(' ');
-      }
-    }
-
-    return 'Usuario';
-  }
-
-  String _capitalizeWord(String value) {
-    if (value.isEmpty) return value;
-    return '${value[0].toUpperCase()}${value.substring(1).toLowerCase()}';
-  }
-
-
-
   @override
   Widget build(BuildContext context) {
     final SessionPlaybackController playback =
         SessionPlaybackController.instance;
     final DateTime now = DateTime.now();
     final String greeting = _greetingForHour(now.hour);
-    final String userName = _currentUserName();
 
     return AnimatedBuilder(
       animation: playback,
       builder: (context, _) {
         final bool hasPlaybackSession = playback.hasCurrentSession;
         final AudioSession? currentSession = playback.currentSession;
-        
-        final String sessionMessage = hasPlaybackSession && currentSession != null
-            ? (playback.isPlaybackActive
-                ? 'Tu audio sigue activo en segundo plano.'
-                : 'Tu sesion pausada esta lista para continuar.')
-            : 'Explora la biblioteca para comenzar una sesion.';
 
         return Theme(
           data: AppTheme.lightTheme,
@@ -250,95 +262,48 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 top: true,
                                 bottom: false,
                                 sliver: SliverToBoxAdapter(
-                                  child: SizedBox(height: 20),
+                                  child: SizedBox(height: _vComponent),
                                 ),
                               ),
                               SliverPadding(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
+                                  horizontal: _hPadding,
                                 ),
                                 sliver: SliverToBoxAdapter(
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              greeting,
-                                              style:
-                                                  GoogleFonts.plusJakartaSans(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w500,
-                                                    color: _dashboardMuted,
-                                                    letterSpacing: 0.2,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              userName,
-                                              style:
-                                                  GoogleFonts.plusJakartaSans(
-                                                    fontSize: 34,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: _dashboardForeground,
-                                                    letterSpacing: -1.2,
-                                                    height: 1.0,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              sessionMessage,
-                                              style:
-                                                  GoogleFonts.plusJakartaSans(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w500,
-                                                    color: _dashboardMuted,
-                                                    height: 1.4,
-                                                  ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Container(
-                                        width: 48,
-                                        height: 48,
-                                        decoration: BoxDecoration(
-                                          color: _dashboardCard,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: Colors.white.withValues(
-                                              alpha: 0.06,
-                                            ),
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: _dashboardPrimary
-                                                  .withValues(alpha: 0.10),
-                                              blurRadius: 24,
-                                            ),
-                                          ],
-                                        ),
-                                        child: const Icon(
-                                          Icons.person_outline_rounded,
-                                          color: _dashboardPrimary,
-                                          size: 22,
-                                        ),
-                                      ),
-                                    ],
+                                  child: StreamBuilder<String?>(
+                                    stream:
+                                        UserProfileRepository.watchPreferredName(),
+                                    builder: (context, snapshot) {
+                                      final userName =
+                                          UserProfileRepository.resolveVisibleName(
+                                            preferredName: snapshot.data,
+                                          );
+                                      return _DashboardHeader(
+                                        greeting: greeting,
+                                        userName: userName,
+                                      );
+                                    },
                                   ),
                                 ),
                               ),
                               const SliverToBoxAdapter(
-                                child: SizedBox(height: 30),
+                                child: SizedBox(height: _vComponent),
+                              ),
+                              const SliverToBoxAdapter(
+                                child: _DashboardDailyStatus(),
+                              ),
+                              const SliverToBoxAdapter(
+                                child: SizedBox(height: _vSection),
+                              ),
+                              const SliverToBoxAdapter(
+                                child: Center(child: PetWidget()),
+                              ),
+                              const SliverToBoxAdapter(
+                                child: SizedBox(height: _vSection),
                               ),
                               SliverPadding(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
+                                  horizontal: _hPadding,
                                 ),
                                 sliver: SliverToBoxAdapter(
                                   child: Semantics(
@@ -350,9 +315,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                                         padding: const EdgeInsets.all(20),
                                         decoration: BoxDecoration(
                                           color: _sosBackground,
-                                          borderRadius: BorderRadius.circular(24),
+                                          borderRadius: BorderRadius.circular(
+                                            24,
+                                          ),
                                           border: Border.all(
-                                            color: const Color(0xFF4CAF7D).withValues(alpha: 0.3),
+                                            color: const Color(
+                                              0xFF4CAF7D,
+                                            ).withValues(alpha: 0.3),
                                             width: 0.5,
                                           ),
                                         ),
@@ -364,16 +333,38 @@ class _DashboardScreenState extends State<DashboardScreen>
                                               child: AnimatedBuilder(
                                                 animation: _sosPulse,
                                                 builder: (context, _) => Transform.scale(
-                                                  scale: 1.0 + (_sosPulse.value * 0.1),
+                                                  scale:
+                                                      1.0 +
+                                                      (_sosPulse.value * 0.1),
                                                   child: Container(
-                                                    width: 120 * (1.0 + (_sosPulse.value * 0.2)),
-                                                    height: 120 * (1.0 + (_sosPulse.value * 0.2)),
+                                                    width:
+                                                        120 *
+                                                        (1.0 +
+                                                            (_sosPulse.value *
+                                                                0.2)),
+                                                    height:
+                                                        120 *
+                                                        (1.0 +
+                                                            (_sosPulse.value *
+                                                                0.2)),
                                                     decoration: BoxDecoration(
                                                       shape: BoxShape.circle,
                                                       gradient: RadialGradient(
                                                         colors: [
-                                                          const Color(0xFF4CAF7D).withValues(alpha: 0.1 * (1.0 - _sosPulse.value)),
-                                                          const Color(0xFF4CAF7D).withValues(alpha: 0.0),
+                                                          const Color(
+                                                            0xFF4CAF7D,
+                                                          ).withValues(
+                                                            alpha:
+                                                                0.1 *
+                                                                (1.0 -
+                                                                    _sosPulse
+                                                                        .value),
+                                                          ),
+                                                          const Color(
+                                                            0xFF4CAF7D,
+                                                          ).withValues(
+                                                            alpha: 0.0,
+                                                          ),
                                                         ],
                                                       ),
                                                     ),
@@ -384,9 +375,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                                             Row(
                                               children: [
                                                 Container(
-                                                  padding: const EdgeInsets.all(10),
+                                                  padding: const EdgeInsets.all(
+                                                    10,
+                                                  ),
                                                   decoration: BoxDecoration(
-                                                    color: const Color(0xFF4CAF7D).withValues(alpha: 0.15),
+                                                    color: const Color(
+                                                      0xFF4CAF7D,
+                                                    ).withValues(alpha: 0.15),
                                                     shape: BoxShape.circle,
                                                   ),
                                                   child: const Icon(
@@ -398,26 +393,42 @@ class _DashboardScreenState extends State<DashboardScreen>
                                                 const SizedBox(width: 14),
                                                 Expanded(
                                                   child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    mainAxisSize: MainAxisSize.min,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
                                                     children: [
                                                       Text(
                                                         '¿Necesitas ayuda ahora?',
-                                                        style: GoogleFonts.plusJakartaSans(
-                                                          fontSize: 16,
-                                                          fontWeight: FontWeight.w700,
-                                                          color: _sosForeground,
-                                                          letterSpacing: -0.3,
-                                                        ),
+                                                        style:
+                                                            GoogleFonts.plusJakartaSans(
+                                                              fontSize: 16,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700,
+                                                              color:
+                                                                  _sosForeground,
+                                                              letterSpacing:
+                                                                  -0.3,
+                                                            ),
                                                       ),
                                                       const SizedBox(height: 2),
                                                       Text(
                                                         'Línea 106 · atención inmediata',
-                                                        style: GoogleFonts.plusJakartaSans(
-                                                          fontSize: 12,
-                                                          fontWeight: FontWeight.w500,
-                                                          color: _sosForeground.withValues(alpha: 0.5),
-                                                        ),
+                                                        style:
+                                                            GoogleFonts.plusJakartaSans(
+                                                              fontSize: 12,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w500,
+                                                              color:
+                                                                  _sosForeground
+                                                                      .withValues(
+                                                                        alpha:
+                                                                            0.5,
+                                                                      ),
+                                                            ),
                                                       ),
                                                     ],
                                                   ),
@@ -427,24 +438,50 @@ class _DashboardScreenState extends State<DashboardScreen>
                                                   color: Colors.transparent,
                                                   child: InkWell(
                                                     onTap: _makeEmergencyCall,
-                                                    borderRadius: BorderRadius.circular(16),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          16,
+                                                        ),
                                                     child: Ink(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 14,
+                                                            vertical: 10,
+                                                          ),
                                                       decoration: BoxDecoration(
-                                                        color: const Color(0xFF4CAF7D).withValues(alpha: 0.15),
-                                                        borderRadius: BorderRadius.circular(16),
+                                                        color:
+                                                            const Color(
+                                                              0xFF4CAF7D,
+                                                            ).withValues(
+                                                              alpha: 0.15,
+                                                            ),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              16,
+                                                            ),
                                                         border: Border.all(
-                                                          color: const Color(0xFF4CAF7D).withValues(alpha: 0.4),
+                                                          color:
+                                                              const Color(
+                                                                0xFF4CAF7D,
+                                                              ).withValues(
+                                                                alpha: 0.4,
+                                                              ),
                                                           width: 0.5,
                                                         ),
                                                       ),
                                                       child: Text(
                                                         'Llamar 106',
-                                                        style: GoogleFonts.plusJakartaSans(
-                                                          fontSize: 12,
-                                                          fontWeight: FontWeight.w700,
-                                                          color: const Color(0xFF4CAF7D),
-                                                        ),
+                                                        style:
+                                                            GoogleFonts.plusJakartaSans(
+                                                              fontSize: 12,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700,
+                                                              color:
+                                                                  const Color(
+                                                                    0xFF4CAF7D,
+                                                                  ),
+                                                            ),
                                                       ),
                                                     ),
                                                   ),
@@ -461,17 +498,33 @@ class _DashboardScreenState extends State<DashboardScreen>
                               ),
 
                               const SliverToBoxAdapter(
-                                child: SizedBox(height: 28),
+                                child: SizedBox(height: _vSection),
+                              ),
+
+                              SliverPadding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: _hPadding,
+                                ),
+                                sliver: SliverToBoxAdapter(
+                                  child: _QuickActionsGrid(
+                                    onLogMood: () =>
+                                        setState(() => _selectedIndex = 1),
+                                    onOpenChat: _navigateToChat,
+                                  ),
+                                ),
+                              ),
+                              const SliverToBoxAdapter(
+                                child: SizedBox(height: _vSection),
                               ),
                               if (hasPlaybackSession && currentSession != null)
                                 SliverPadding(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
+                                    horizontal: _hPadding,
                                   ),
                                   sliver: SliverToBoxAdapter(
                                     child: Padding(
                                       padding: const EdgeInsets.only(
-                                        bottom: 18,
+                                        bottom: _vSection,
                                       ),
                                       child: _ActiveSessionCard(
                                         title: currentSession.title,
@@ -480,8 +533,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                                         isPlaying: playback.isPlaybackActive,
                                         coverImageUrl:
                                             currentSession.coverImageUrl,
-                                        fallbackCoverAssetPath:
-                                            currentSession.category.coverImagePath,
+                                        fallbackCoverAssetPath: currentSession
+                                            .category
+                                            .coverImagePath,
                                         onContinue: () =>
                                             _openAudioSession(currentSession),
                                         onClose: _closeActiveSession,
@@ -491,7 +545,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 ),
                               SliverPadding(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
+                                  horizontal: _hPadding,
                                 ),
                                 sliver: SliverToBoxAdapter(
                                   child: Column(
@@ -543,7 +597,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                           color: _dashboardMuted,
                                         ),
                                       ),
-                                      const SizedBox(height: 18),
+                                      const SizedBox(height: _vComponent),
                                       StreamBuilder<List<AudioSession>>(
                                         stream: _featuredSessionsStream,
                                         builder: (context, snapshot) {
@@ -551,15 +605,17 @@ class _DashboardScreenState extends State<DashboardScreen>
                                               ConnectionState.waiting) {
                                             return const Padding(
                                               padding: EdgeInsets.symmetric(
-                                                vertical: 12,
+                                                vertical: 24,
                                               ),
                                               child: Center(
                                                 child: SizedBox(
-                                                  width: 20,
-                                                  height: 20,
+                                                  width: 24,
+                                                  height: 24,
                                                   child:
                                                       CircularProgressIndicator(
                                                         strokeWidth: 2,
+                                                        color:
+                                                            _dashboardPrimary,
                                                       ),
                                                 ),
                                               ),
@@ -568,7 +624,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
                                           if (snapshot.hasError) {
                                             return Text(
-                                              'La biblioteca no esta disponible en este momento.',
+                                              'La biblioteca no está disponible en este momento.',
                                               style:
                                                   GoogleFonts.plusJakartaSans(
                                                     fontSize: 13,
@@ -595,38 +651,74 @@ class _DashboardScreenState extends State<DashboardScreen>
                                             );
                                           }
 
+                                          final heroSession = sessions.first;
+                                          final secondarySessions = sessions
+                                              .skip(1)
+                                              .toList();
+
                                           return Column(
-                                            children: sessions
-                                                .map(
-                                                  (session) => Padding(
-                                                    padding:
-                                                        const EdgeInsets.only(
-                                                          bottom: 12,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              _HeroRecommendationCard(
+                                                session: heroSession,
+                                                onTap: () => _openAudioSession(
+                                                  heroSession,
+                                                ),
+                                                categoryLabel: _categoryLabel(
+                                                  heroSession.category,
+                                                ),
+                                                durationLabel: _formatMinutes(
+                                                  heroSession.durationSeconds,
+                                                ),
+                                              ),
+                                              if (secondarySessions
+                                                  .isNotEmpty) ...[
+                                                const SizedBox(
+                                                  height: _vSection,
+                                                ),
+                                                SizedBox(
+                                                  height:
+                                                      170, // Height for secondary carousel
+                                                  child: ListView.builder(
+                                                    scrollDirection:
+                                                        Axis.horizontal,
+                                                    padding: EdgeInsets.zero,
+                                                    physics:
+                                                        const BouncingScrollPhysics(),
+                                                    itemCount: secondarySessions
+                                                        .length,
+                                                    itemBuilder: (context, index) {
+                                                      final session =
+                                                          secondarySessions[index];
+                                                      return Padding(
+                                                        padding:
+                                                            const EdgeInsets.only(
+                                                              right: 12,
+                                                            ),
+                                                        child: _SecondaryRecommendationCard(
+                                                          session: session,
+                                                          onTap: () =>
+                                                              _openAudioSession(
+                                                                session,
+                                                              ),
+                                                          categoryLabel:
+                                                              _categoryLabel(
+                                                                session
+                                                                    .category,
+                                                              ),
+                                                          durationLabel:
+                                                              _formatMinutes(
+                                                                session
+                                                                    .durationSeconds,
+                                                              ),
                                                         ),
-                                                    child: _RecommendedSessionTile(
-                                                      title: session.title,
-                                                      category: _categoryLabel(
-                                                        session.category,
-                                                      ),
-                                                      durationLabel:
-                                                          _formatMinutes(
-                                                            session
-                                                                .durationSeconds,
-                                                          ),
-                                                      coverImageUrl:
-                                                          session.coverImageUrl,
-                                                      fallbackCoverAssetPath:
-                                                          session
-                                                              .category
-                                                              .coverImagePath,
-                                                      onTap: () =>
-                                                          _openAudioSession(
-                                                            session,
-                                                          ),
-                                                    ),
+                                                      );
+                                                    },
                                                   ),
-                                                )
-                                                .toList(),
+                                                ),
+                                              ],
+                                            ],
                                           );
                                         },
                                       ),
@@ -635,11 +727,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 ),
                               ),
                               const SliverToBoxAdapter(
-                                child: SizedBox(height: 14),
+                                child: SizedBox(height: _vSection),
                               ),
                               SliverPadding(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
+                                  horizontal: _hPadding,
                                 ),
                                 sliver: SliverToBoxAdapter(
                                   child: Material(
@@ -727,13 +819,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 ),
                               ),
                               const SliverToBoxAdapter(
-                                child: SizedBox(height: 14),
+                                child: SizedBox(height: _vSection),
                               ),
 
                               SliverToBoxAdapter(
                                 child: SizedBox(
                                   height:
-                                      100 + MediaQuery.of(context).padding.bottom,
+                                      120 +
+                                      MediaQuery.of(context).padding.bottom,
                                 ),
                               ),
                             ],
@@ -752,6 +845,307 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
         );
       },
+    );
+  }
+}
+
+class _QuickActionsGrid extends StatelessWidget {
+  final VoidCallback onLogMood;
+  final VoidCallback onOpenChat;
+
+  const _QuickActionsGrid({required this.onLogMood, required this.onOpenChat});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: Text(
+            '¿Cómo estás hoy?',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: _dashboardForeground,
+              letterSpacing: -0.4,
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: _ActionCard(
+                title: 'Bitácora',
+                subtitle: 'Registrar estado',
+                icon: Icons.edit_note_rounded,
+                color: const Color(0xFFC8E6D9),
+                onTap: onLogMood,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _ActionCard(
+                title: 'Asistente',
+                subtitle: 'Chat de apoyo',
+                icon: Icons.auto_awesome_rounded,
+                color: const Color(0xFFE6D9C8),
+                onTap: onOpenChat,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _DashboardHeader extends StatelessWidget {
+  final String greeting;
+  final String userName;
+
+  const _DashboardHeader({required this.greeting, required this.userName});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                greeting,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: _dashboardMuted,
+                  letterSpacing: 0.1,
+                ),
+              ),
+              Text(
+                userName,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  color: _dashboardForeground,
+                  letterSpacing: -0.8,
+                  height: 1.1,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 16),
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: _dashboardPrimary.withValues(alpha: 0.08),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: _dashboardPrimary.withValues(alpha: 0.08),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.person_outline_rounded,
+            color: _dashboardPrimary,
+            size: 20,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DashboardDailyStatus extends StatelessWidget {
+  const _DashboardDailyStatus();
+
+  String _formatTimeAgo(DateTime? dateTime) {
+    if (dateTime == null) return 'Comenzando viaje';
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.inSeconds < 60) return 'Justo ahora';
+    if (diff.inMinutes < 60) return 'Hace ${diff.inMinutes}m';
+    if (diff.inHours < 24) return 'Hace ${diff.inHours}h';
+    if (diff.inDays == 1) return 'Ayer';
+    return 'Hace ${diff.inDays}d';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<PetProfile?>(
+      stream: petProfileProvider(),
+      builder: (context, petSnapshot) {
+        final profile = petSnapshot.data;
+        if (profile == null) return const SizedBox.shrink();
+
+        final String timeLabel = _formatTimeAgo(profile.lastInteractionAt);
+
+        return StreamBuilder(
+          stream: HealthRepository.watchWeeklyLogs(),
+          builder: (context, logsSnapshot) {
+            final int racha =
+                logsSnapshot.hasData
+                    ? HealthRepository.calculateCheckInStreak(
+                      logsSnapshot.data!,
+                    )
+                    : profile.petRacha;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  if (racha > 0) ...[
+                    _StatusChip(
+                      icon: Icons.local_fire_department_rounded,
+                      label: '$racha días 🔥',
+                      color: const Color(0xFFFF9E58),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  _StatusChip(
+                    icon: Icons.auto_awesome_rounded,
+                    label: timeLabel,
+                    color: _dashboardPrimary,
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _StatusChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color.withValues(alpha: 0.9),
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ActionCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Ink(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: _dashboardCard,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: Color.lerp(color, Colors.black, 0.4),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _dashboardForeground,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: _dashboardMuted,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -798,27 +1192,30 @@ class _ActiveSessionCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (coverImageUrl != null && coverImageUrl!.startsWith('http'))
+                  if (coverImageUrl != null &&
+                      coverImageUrl!.startsWith('http'))
                     Image.network(
                       coverImageUrl!,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          Image.asset(
-                            fallbackCoverAssetPath,
-                            fit: BoxFit.cover,
-                          ),
+                      errorBuilder: (context, error, stackTrace) => Image.asset(
+                        fallbackCoverAssetPath,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   if (coverImageUrl == null)
-                    Image.asset(
-                      fallbackCoverAssetPath,
-                      fit: BoxFit.cover,
-                    ),
+                    Image.asset(fallbackCoverAssetPath, fit: BoxFit.cover),
                   Center(
                     child: isPlaying
-                        ? const Icon(Icons.graphic_eq_rounded,
-                            color: _dashboardPrimary, size: 24)
-                        : const Icon(Icons.pause_rounded,
-                            color: _dashboardPrimary, size: 24),
+                        ? const Icon(
+                            Icons.graphic_eq_rounded,
+                            color: _dashboardPrimary,
+                            size: 24,
+                          )
+                        : const Icon(
+                            Icons.pause_rounded,
+                            color: _dashboardPrimary,
+                            size: 24,
+                          ),
                   ),
                 ],
               ),
@@ -896,120 +1293,6 @@ class _ActiveSessionCard extends StatelessWidget {
   }
 }
 
-class _RecommendedSessionTile extends StatelessWidget {
-  const _RecommendedSessionTile({
-    required this.title,
-    required this.category,
-    required this.durationLabel,
-    this.coverImageUrl,
-    required this.fallbackCoverAssetPath,
-    required this.onTap,
-  });
-
-  final String title;
-  final String category;
-  final String durationLabel;
-  final String? coverImageUrl;
-  final String fallbackCoverAssetPath;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(28),
-        onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: _dashboardSecondary.withValues(alpha: 0.46),
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(
-                  color: _dashboardCard,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: coverImageUrl != null &&
-                          coverImageUrl!.startsWith('http')
-                      ? Image.network(
-                          coverImageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Image.asset(
-                            fallbackCoverAssetPath,
-                            fit: BoxFit.cover,
-                          ),
-                        )
-                      : Image.asset(
-                          fallbackCoverAssetPath,
-                          fit: BoxFit.cover,
-                        ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: _dashboardForeground,
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${category.toUpperCase()} · $durationLabel',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: _dashboardMuted,
-                        letterSpacing: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: _dashboardPrimary,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: _dashboardPrimary.withValues(alpha: 0.18),
-                      blurRadius: 18,
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.play_arrow_rounded,
-                  color: _dashboardBackground,
-                  size: 24,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _FloatingNavBar extends StatelessWidget {
   final int selectedIndex;
   final void Function(int) onItemTapped;
@@ -1070,60 +1353,335 @@ class _FloatingNavBar extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             AnimatedContainer(
-                            duration: const Duration(milliseconds: 220),
-                            curve: Curves.easeOutCubic,
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: isActive
-                                  ? (backgroundColor != null &&
-                                            backgroundColor!.computeLuminance() <
-                                                0.1
-                                        ? _dashboardPrimary.withValues(
-                                            alpha: 0.85,
-                                          )
-                                        : _dashboardPrimary)
-                                  : Colors.transparent,
-                              shape: BoxShape.circle,
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOutCubic,
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: isActive
+                                    ? (backgroundColor != null &&
+                                              backgroundColor!
+                                                      .computeLuminance() <
+                                                  0.1
+                                          ? _dashboardPrimary.withValues(
+                                              alpha: 0.85,
+                                            )
+                                          : _dashboardPrimary)
+                                    : Colors.transparent,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                _icons[i],
+                                size: 22,
+                                color: isActive
+                                    ? (backgroundColor != null &&
+                                              backgroundColor!
+                                                      .computeLuminance() <
+                                                  0.1
+                                          ? Colors.white
+                                          : _dashboardBackground)
+                                    : _dashboardMuted,
+                              ),
                             ),
-                            child: Icon(
-                              _icons[i],
-                              size: 22,
-                              color: isActive
-                                  ? (backgroundColor != null &&
-                                            backgroundColor!.computeLuminance() <
-                                                0.1
-                                        ? Colors.white
-                                        : _dashboardBackground)
-                                  : _dashboardMuted,
+                            const SizedBox(height: 2),
+                            Text(
+                              _labels[i],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11,
+                                fontWeight: isActive
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: isActive
+                                    ? _dashboardForeground
+                                    : _dashboardMuted,
+                                letterSpacing: 0.2,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _labels[i],
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11,
-                              fontWeight: isActive
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: isActive
-                                  ? _dashboardForeground
-                                  : _dashboardMuted,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroRecommendationCard extends StatelessWidget {
+  final AudioSession session;
+  final VoidCallback onTap;
+  final String categoryLabel;
+  final String durationLabel;
+
+  const _HeroRecommendationCard({
+    required this.session,
+    required this.onTap,
+    required this.categoryLabel,
+    required this.durationLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final String fallbackAsset = session.category.coverImagePath;
+    final String? coverUrl = session.coverImageUrl;
+
+    return Container(
+      height: 200,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: _dashboardCard,
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: _dashboardPrimary.withValues(alpha: 0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(32),
+        child: Stack(
+          children: [
+            // Background Image
+            Positioned.fill(
+              child: coverUrl != null && coverUrl.startsWith('http')
+                  ? Image.network(
+                      coverUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          Image.asset(fallbackAsset, fit: BoxFit.cover),
+                    )
+                  : Image.asset(fallbackAsset, fit: BoxFit.cover),
+            ),
+
+            // Gradient Overlay
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.1),
+                      Colors.black.withValues(alpha: 0.7),
+                    ],
+                    stops: const [0.4, 1.0],
+                  ),
+                ),
+              ),
+            ),
+
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.3),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Text(
+                      'ESTRENO RECOMENDADO',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: 1.2,
                       ),
                     ),
                   ),
-                );
-              }),
+                  const SizedBox(height: 10),
+                  Text(
+                    session.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Text(
+                        categoryLabel.toUpperCase(),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white.withValues(alpha: 0.8),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      Container(
+                        width: 3,
+                        height: 3,
+                        margin: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: const BoxDecoration(
+                          color: Colors.white70,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      Text(
+                        durationLabel,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          );
-        },
+
+            // Play Button Overlay
+            Positioned(
+              bottom: 20,
+              right: 20,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: _dashboardPrimary,
+                      size: 32,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Full-card InkWell
+            Positioned.fill(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(32),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _SecondaryRecommendationCard extends StatelessWidget {
+  final AudioSession session;
+  final VoidCallback onTap;
+  final String categoryLabel;
+  final String durationLabel;
+
+  const _SecondaryRecommendationCard({
+    required this.session,
+    required this.onTap,
+    required this.categoryLabel,
+    required this.durationLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final String fallbackAsset = session.category.coverImagePath;
+    final String? coverUrl = session.coverImageUrl;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: SizedBox(
+          width: 140,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 100,
+                width: 140,
+                decoration: BoxDecoration(
+                  color: _dashboardSecondary.withValues(alpha: 0.46),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: coverUrl != null && coverUrl.startsWith('http')
+                      ? Image.network(
+                          coverUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Image.asset(fallbackAsset, fit: BoxFit.cover),
+                        )
+                      : Image.asset(fallbackAsset, fit: BoxFit.cover),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                session.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _dashboardForeground,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '$categoryLabel · $durationLabel',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: _dashboardMuted,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

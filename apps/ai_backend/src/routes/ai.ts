@@ -80,6 +80,7 @@ const recommendationResponseSchema = z.object({
 });
 
 export const aiRouter = Router();
+const chatRequestTimeoutMs = 90_000;
 
 function getBearerToken(request: Request): string | null {
   const authorization = request.header('authorization')?.trim();
@@ -90,6 +91,10 @@ function getBearerToken(request: Request): string | null {
   const match = authorization.match(/^Bearer\s+(.+)$/i);
   return match?.[1]?.trim() || null;
 }
+
+aiRouter.get('/health', (_req, res) => {
+  res.status(200).json({ ok: true });
+});
 
 aiRouter.post(
   '/chat',
@@ -104,9 +109,12 @@ aiRouter.post(
       return;
     }
 
+    let userName: string | undefined;
     try {
-      await verifyFirebaseIdToken(idToken);
+      const decodedToken = await verifyFirebaseIdToken(idToken);
+      userName = decodedToken.name || decodedToken.display_name;
     } catch (err: any) {
+
       console.error('[ai/chat] Firebase token verification failed:', err);
       res
         .status(401)
@@ -199,13 +207,15 @@ aiRouter.post(
     });
 
     try {
-      req.setTimeout(25_000);
-      res.setTimeout(25_000);
+      req.setTimeout(chatRequestTimeoutMs);
+      res.setTimeout(chatRequestTimeoutMs);
 
       const result = createTherapeuticTextStream(
         message,
         abortController.signal,
+        userName,
       );
+
 
       const streamProbe = await probeTextStream(result);
 
@@ -312,8 +322,8 @@ aiRouter.post(
     req.on('aborted', abort);
 
     try {
-      req.setTimeout(25_000);
-      res.setTimeout(25_000);
+      req.setTimeout(chatRequestTimeoutMs);
+      res.setTimeout(chatRequestTimeoutMs);
 
       const prompt = [
         'Genera una recomendacion prudente y estructurada usando este contexto JSON.',

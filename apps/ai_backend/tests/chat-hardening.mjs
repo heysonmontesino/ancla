@@ -77,7 +77,12 @@ assert.equal(
 );
 
 assert.ok(systemPrompt.includes('prioriza naturalidad, criterio y sensibilidad al matiz del usuario'));
-assert.ok(systemPrompt.includes('puedes ser breve o un poco mas amplio segun lo necesite el momento'));
+assert.ok(systemPrompt.includes('por defecto responde breve: normalmente 2 a 4 frases cortas'));
+assert.ok(systemPrompt.includes('no intentes resolver todo en un solo turno'));
+assert.ok(systemPrompt.includes('cuando tenga sentido, termina con una pregunta breve para continuar'));
+assert.ok(systemPrompt.includes('Responde siempre en el idioma del usuario.'));
+assert.ok(systemPrompt.includes('si el usuario escribe en espanol, responde obligatoriamente en espanol neutro, natural y claro'));
+assert.ok(systemPrompt.includes('No cambies a ingles ni a otro idioma salvo que el usuario lo pida de forma explicita'));
 assert.ok(systemPrompt.includes('la recomendacion no debe contaminar ni romper el flujo del cuerpo principal'));
 assert.ok(systemPrompt.includes('abrir o cerrar toda la respuesta con comillas'));
 assert.equal(systemPrompt.includes('Ejemplos de estilo deseado'), false);

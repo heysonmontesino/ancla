@@ -7,6 +7,36 @@ function optionalSecret(value: string | undefined) {
   return trimmed ? trimmed : undefined;
 }
 
+function normalizePrivateKey(value: string | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  let normalized = trimmed;
+
+  if (
+    (normalized.startsWith('"') && normalized.endsWith('"')) ||
+    (normalized.startsWith("'") && normalized.endsWith("'"))
+  ) {
+    normalized = normalized.slice(1, -1);
+  }
+
+  normalized = normalized
+    .replace(/\\r/g, '')
+    .replace(/\r/g, '')
+    .replace(/\\n/g, '\n')
+    .replace(/-----BEGIN PRIVATE KEY-----\s+/, '-----BEGIN PRIVATE KEY-----\n')
+    .replace(/\s+-----END PRIVATE KEY-----/, '\n-----END PRIVATE KEY-----')
+    .trim();
+
+  if (normalized.includes('BEGIN PRIVATE KEY') && !normalized.endsWith('\n')) {
+    normalized = `${normalized}\n`;
+  }
+
+  return normalized;
+}
+
 function parseBooleanFlag(value: string | undefined, fallback = false) {
   if (value == null || value.trim() === '') {
     return fallback;
@@ -38,7 +68,7 @@ const envSchema = z.object({
   AI_RATE_LIMIT_MAX: z.string().optional(),
   AI_RATE_LIMIT_WINDOW_MS: z.string().optional(),
   AI_GATEWAY_API_KEY: z.string().optional(),
-  AI_MODEL: z.string().min(1).default('openai/gpt-5-mini'),
+  AI_MODEL: z.string().min(1).default('openai/gpt-4o-mini'),
   FIREBASE_PROJECT_ID: z.string().min(1, 'FIREBASE_PROJECT_ID is required'),
   FIREBASE_CLIENT_EMAIL: z.string().min(1, 'FIREBASE_CLIENT_EMAIL is required'),
   FIREBASE_PRIVATE_KEY: z.string().min(1, 'FIREBASE_PRIVATE_KEY is required'),
@@ -88,21 +118,16 @@ export const env = {
   AI_MODEL: parsedEnv.AI_MODEL.trim(),
   FIREBASE_PROJECT_ID: parsedEnv.FIREBASE_PROJECT_ID.trim(),
   FIREBASE_CLIENT_EMAIL: parsedEnv.FIREBASE_CLIENT_EMAIL.trim(),
-  FIREBASE_PRIVATE_KEY: parsedEnv.FIREBASE_PRIVATE_KEY
-    .trim()
-    .replace(/^["']/, '') // Remove leading quotes
-    .replace(/["']$/, '') // Remove trailing quotes
-    .replace(/\\n/g, '\n'), // Replace literal \n with real newlines
+  FIREBASE_PRIVATE_KEY:
+    normalizePrivateKey(parsedEnv.FIREBASE_PRIVATE_KEY) ??
+    parsedEnv.FIREBASE_PRIVATE_KEY.trim(),
   AI_GATEWAY_ENABLE_BYOK: parseBooleanFlag(parsedEnv.AI_GATEWAY_ENABLE_BYOK),
   BYOK_OPENAI_API_KEY: optionalSecret(parsedEnv.BYOK_OPENAI_API_KEY),
   BYOK_ANTHROPIC_API_KEY: optionalSecret(parsedEnv.BYOK_ANTHROPIC_API_KEY),
   BYOK_VERTEX_PROJECT: optionalSecret(parsedEnv.BYOK_VERTEX_PROJECT),
   BYOK_VERTEX_LOCATION: optionalSecret(parsedEnv.BYOK_VERTEX_LOCATION),
   BYOK_VERTEX_CLIENT_EMAIL: optionalSecret(parsedEnv.BYOK_VERTEX_CLIENT_EMAIL),
-  BYOK_VERTEX_PRIVATE_KEY: parsedEnv.BYOK_VERTEX_PRIVATE_KEY?.replace(
-    /\\n/g,
-    '\n',
-  ),
+  BYOK_VERTEX_PRIVATE_KEY: normalizePrivateKey(parsedEnv.BYOK_VERTEX_PRIVATE_KEY),
   BYOK_BEDROCK_ACCESS_KEY_ID: optionalSecret(
     parsedEnv.BYOK_BEDROCK_ACCESS_KEY_ID,
   ),

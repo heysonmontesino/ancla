@@ -55,6 +55,8 @@ type AiErrorCategory =
   | 'timeout'
   | 'model_unavailable'
   | 'invalid_request'
+  | 'upstream_5xx'
+  | 'parse_error'
   | 'network'
   | 'empty_response'
   | 'unknown';
@@ -103,6 +105,8 @@ class AiProviderError extends Error {
 
 const providerTimeoutByokMs = 15_000;
 const openRouterBaseUrl = 'https://openrouter.ai/api/v1/chat/completions';
+const openRouterInitialResponseTimeoutMs = 45_000;
+const openRouterChunkInactivityTimeoutMs = 20_000;
 
 export function containsAcuteRiskLanguage(message: string): boolean {
   return acuteRiskPattern.test(message);
@@ -156,16 +160,22 @@ export function getNonEmergencyHighActivationReply(): string {
 export function createTherapeuticTextStream(
   message: string,
   abortSignal: AbortSignal,
+  userName?: string,
 ) {
   if (env.AI_MODEL.startsWith('openrouter/')) {
-    return createOpenRouterTextStream(message, abortSignal);
+    return createOpenRouterTextStream(message, abortSignal, userName);
   }
+
+  const prompt = userName
+    ? `[Contexto: El usuario se llama ${userName}]\n\n${message}`
+    : message;
 
   return streamText({
     model: gateway(env.AI_MODEL),
     system: systemPrompt,
-    prompt: message,
+    prompt,
     abortSignal,
+
     temperature: 0.4,
     maxRetries: 1,
     maxOutputTokens: 350,
@@ -417,10 +427,16 @@ function getBedrockByokConfig() {
 function createOpenRouterTextStream(
   message: string,
   abortSignal: AbortSignal,
+  userName?: string,
 ): StreamableTextResult {
   const apiKey = process.env.OPENROUTER_API_KEY?.trim();
   const provider = 'openrouter';
   const configuredModel = env.AI_MODEL;
+
+  const prompt = userName
+    ? `[Contexto: El usuario se llama ${userName}]\n\n${message}`
+    : message;
+
 
   if (!apiKey) {
     throw new AiProviderError({
@@ -436,9 +452,13 @@ function createOpenRouterTextStream(
   const textStream = new ReadableStream<string>({
     async start(controller) {
       try {
+        const upstreamSignal = AbortSignal.any([
+          abortSignal,
+          AbortSignal.timeout(openRouterInitialResponseTimeoutMs),
+        ]);
         const response = await fetch(openRouterBaseUrl, {
           method: 'POST',
-          signal: abortSignal,
+          signal: upstreamSignal,
           headers: {
             Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
@@ -447,7 +467,7 @@ function createOpenRouterTextStream(
             model,
             messages: [
               { role: 'system', content: systemPrompt },
-              { role: 'user', content: message },
+              { role: 'user', content: prompt },
             ],
             stream: true,
             temperature: 0.4,
@@ -477,14 +497,32 @@ function createOpenRouterTextStream(
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
+        let parseErrorCount = 0;
+        let emittedChunkCount = 0;
 
         try {
           while (true) {
-            const { done, value } = await reader.read();
+            const { done, value } = await readStreamChunkWithTimeout(
+              reader,
+              openRouterChunkInactivityTimeoutMs,
+            );
 
             if (done) {
               buffer += decoder.decode();
-              processOpenRouterBuffer(buffer, controller);
+              const finalMetrics = processOpenRouterBuffer(buffer, controller);
+              parseErrorCount += finalMetrics.parseErrors;
+              emittedChunkCount += finalMetrics.emittedChunks;
+
+              if (emittedChunkCount == 0 && parseErrorCount > 0) {
+                throw new AiProviderError({
+                  provider,
+                  model: configuredModel,
+                  category: 'parse_error',
+                  message:
+                      'OpenRouter stream ended without readable text chunks due to malformed payloads',
+                });
+              }
+
               controller.close();
               break;
             }
@@ -494,7 +532,9 @@ function createOpenRouterTextStream(
             buffer = segments.pop() ?? '';
 
             for (const segment of segments) {
-              processOpenRouterBuffer(segment, controller);
+              const metrics = processOpenRouterBuffer(segment, controller);
+              parseErrorCount += metrics.parseErrors;
+              emittedChunkCount += metrics.emittedChunks;
             }
           }
         } finally {
@@ -606,6 +646,19 @@ function inferErrorCategory(
     return 'invalid_request';
   }
 
+  if (upstreamStatus != null && upstreamStatus >= 500 && upstreamStatus <= 599) {
+    return 'upstream_5xx';
+  }
+
+  if (
+    normalizedMessage.includes('malformed payload') ||
+    normalizedMessage.includes('unexpected token') ||
+    normalizedMessage.includes('json parse') ||
+    normalizedMessage.includes('without readable text chunks')
+  ) {
+    return 'parse_error';
+  }
+
   if (
     normalizedMessage.includes('network') ||
     normalizedMessage.includes('fetch failed') ||
@@ -626,7 +679,9 @@ function inferErrorCategory(
 function processOpenRouterBuffer(
   rawChunk: string,
   controller: ReadableStreamDefaultController<string>,
-) {
+): { emittedChunks: number; parseErrors: number } {
+  let emittedChunks = 0;
+  let parseErrors = 0;
   const lines = rawChunk
     .split('\n')
     .map(line => line.trim())
@@ -647,6 +702,7 @@ function processOpenRouterBuffer(
     try {
       parsed = JSON.parse(payload) as Record<string, unknown>;
     } catch {
+      parseErrors += 1;
       continue;
     }
 
@@ -662,6 +718,30 @@ function processOpenRouterBuffer(
 
     if (typeof content === 'string' && content.length > 0) {
       controller.enqueue(content);
+      emittedChunks += 1;
+    }
+  }
+
+  return { emittedChunks, parseErrors };
+}
+
+async function readStreamChunkWithTimeout(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  timeoutMs: number,
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`Stream chunk timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    timer.unref?.();
+  });
+
+  try {
+    return await Promise.race([reader.read(), timeout]);
+  } finally {
+    if (timer != null) {
+      clearTimeout(timer);
     }
   }
 }
